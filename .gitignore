@@ -1,0 +1,5 @@
+# build tree: XTulator and the BIOS are cloned and patched here by build.sh
+work/
+# disk images: MS-DOS and games are not distributed with this project
+*.img
+*.ima

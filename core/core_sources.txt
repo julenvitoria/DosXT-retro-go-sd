@@ -1,0 +1,1 @@
+machine.c memory.c ports.c timing.c xt_pool.c debuglog.c utility.c cpu/cpu.c chipset/i8237.c chipset/i8253.c chipset/i8255.c chipset/i8259.c modules/audio/pcspeaker.c modules/disk/biosdisk.c modules/video/cga.c int10ext.c vga_hle.c mouse_hle.c
