@@ -252,8 +252,26 @@ static void release_pad_keys(void) {
         if (prev_buttons & (1u << i)) pad_key(i, 0);
 }
 
+/* menus (on-screen keyboard, disk list): a held direction keeps moving the
+   cursor, after 0.25 s, about 15 steps per second */
+#define NAV_DIRS (BTN_UP | BTN_DOWN | BTN_LEFT | BTN_RIGHT)
+#define NAV_DELAY 15                   /* frames before the first repeat */
+#define NAV_RATE  4                    /* frames between repeats */
+static uint16_t nav_hold;
+
+static uint32_t nav_repeat(uint32_t b, uint32_t pressed) {
+    uint32_t held = b & NAV_DIRS;
+    if (!held || (pressed & NAV_DIRS)) { nav_hold = 0; return pressed; }
+    if (++nav_hold >= NAV_DELAY && (nav_hold - NAV_DELAY) % NAV_RATE == 0) {
+        if (nav_hold > 1000) nav_hold = NAV_DELAY;
+        return pressed | held;
+    }
+    return pressed;
+}
+
 static void handle_input(uint32_t b) {
     uint32_t pressed = b & ~prev_buttons;
+    if (ui_mode != 0) pressed = nav_repeat(b, pressed);
     if (ui_mode == 0) {
         int osk = -1;
         for (int i = 0; i < GC_BUTTONS; i++)

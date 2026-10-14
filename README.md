@@ -160,7 +160,7 @@ verdad (tras medio segundo, 20 veces por segundo).
 | START / SELECT (Zelda) | Tab / Retroceso | — |
 | PAUSE/SET | Menú de retro-go (volumen, brillo, salir...) | |
 
-Teclado en pantalla (5 filas en la franja inferior): letras, números, F1–F10, Ctrl/Alt/Shift
+Teclado en pantalla (5 filas en la franja inferior; manteniendo la cruceta el cursor sigue avanzando): letras, números, F1–F10, Ctrl/Alt/Shift
 (se quedan "pulsadas" hasta la siguiente tecla, para Ctrl+C, Shift+letra, etc.) y teclas especiales:
 
 - **A:** menú de discos: lista los `.img` de la carpeta de la imagen arrancada y mete el elegido en A:
