@@ -15,6 +15,11 @@
 #   fat12.py newhd <img> [--size MB] [file|folder ...]
 #                                              hard disk image (partitioned, FAT12, up to 16 MB);
 #                                              each PC folder becomes a subdirectory (e.g. C:\\LOOM)
+#   fat12.py todsk <game.img|folder> <GAME.dsk> [--run "CMD;CMD"]
+#                                              a .dsk for the TinyEMU core: copies the image (or
+#                                              builds one from a folder: floppy if it fits, else a
+#                                              hard disk) and writes the AUTOEXEC.BAT that core
+#                                              launches; without --run it guesses the program
 #   fat12.py extract <img> [folder]            copy every file and folder out of the image
 #                                              (default folder: the image name without .img)
 #   add/ls/cat/extract also work on hard disk images; add accepts folders too
@@ -266,6 +271,57 @@ def find(img, name):
         if n.upper() == name.upper(): return off, clus, size
     sys.exit("not found: " + name)
 
+
+# ---- todsk: a .dsk for the TinyEMU core (its built-in DOS runs what AUTOEXEC.BAT names) ----
+NOT_THE_GAME = ("INSTALL", "SETUP", "CONFIG", "LOADFIX", "SOUND", "READKEY", "SIMCGA", "CGA", "EGA",
+                "VGA", "TANDY", "MOUSE", "KEYB", "AUTOEXEC", "UNINSTAL", "CHOICE")
+
+def root_names(img, dc=0):
+    out = []
+    for off in dir_slot_offsets(img, dc):
+        e = img[off:off + 32]
+        if e[0] == 0: break
+        if e[0] == 0xE5 or e[11] & 0x08 or e[0] == 0x2E: continue
+        b = e[0:8].decode("cp437").rstrip(); x = e[8:11].decode("cp437").rstrip()
+        out.append((b, x, bool(e[11] & 0x10), struct.unpack_from("<H", e, 26)[0], off))
+    return out
+
+def delete_entry(img, name83):
+    for b, x, isdir, clus, off in root_names(img):
+        if (b + ("." + x if x else "")).upper() == name83.upper() and not isdir:
+            for c in chain(img, clus): fat_set(img, c, 0)
+            img[off] = 0xE5
+            return True
+    return False
+
+def guess_run(img, hint):
+    """Pick the program to launch: the only .EXE/.COM that is not an installer or a driver, preferring
+    one whose name looks like the disk/folder name; else the same inside the only subdirectory."""
+    def candidates(dc):
+        return [(b, x) for b, x, isdir, c, o in root_names(img, dc)
+                if not isdir and x in ("EXE", "COM") and not any(b.startswith(n) for n in NOT_THE_GAME)]
+    def pick(cands):
+        if not cands: return None
+        h = "".join(ch for ch in hint.upper() if ch.isalnum())
+        for b, x in cands:
+            if b and (b in h or h.startswith(b) or b.startswith(h[:max(3, len(b) - 1)])): return b
+        return sorted(cands)[0][0]
+    c = candidates(0)
+    if c:
+        return [pick(c)], [b + "." + x for b, x in c]
+    dirs = [(b, clus) for b, x, isdir, clus, o in root_names(img) if isdir]
+    if len(dirs) == 1:
+        c = candidates(dirs[0][1])
+        if c:
+            return ["CD " + dirs[0][0], pick(c)], [dirs[0][0] + "\\" + b + "." + x for b, x in c]
+    return None, []
+
+def folder_bytes(path):
+    t = 0
+    for root, _d, files in os.walk(path):
+        for f in files: t += os.path.getsize(os.path.join(root, f))
+    return t
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__ or "see the comment at the top of fat12.py")
@@ -290,6 +346,46 @@ def main():
         disk[off:off + len(vol)] = vol
         open(path, "wb").write(disk)
         print("%s created: %.1f MB hard disk, %d bytes free" % (path, len(disk) / 1048576.0, free_bytes(vol)))
+        return
+    if cmd == "todsk":
+        args = sys.argv[3:]
+        if not args: sys.exit("usage: fat12.py todsk <game.img|folder> <GAME.dsk> [--run \"CMD;CMD\"]")
+        out = args.pop(0); run = None
+        if args and args[0] == "--run":
+            args.pop(0); run = [c.strip() for c in args.pop(0).split(";") if c.strip()]
+        if os.path.exists(out): sys.exit(out + " already exists")
+        hint = os.path.splitext(os.path.basename(os.path.normpath(path)))[0]
+        if os.path.isdir(path):
+            entries_ = sorted(os.listdir(path))
+            total = folder_bytes(path)
+            if total + 64 * 1024 <= 1400 * 1024:
+                disk = new_floppy(); vol = disk; voff = 0
+            else:
+                mb = min(16, max(3, int(total * 1.25 / 1048576) + 2))
+                disk, vol = new_hd(mb); voff = struct.unpack_from("<I", disk, 0x1BE + 8)[0] * 512
+            for f in entries_:
+                if f.upper() == "AUTOEXEC.BAT" and run is None: pass
+                if f.upper() == "AUTOEXEC.BAT": continue
+                add_path(vol, os.path.join(path, f))
+        else:
+            disk = bytearray(open(path, "rb").read())
+            voff, vol = split_volume(disk)
+            if run is None:
+                for b, x, isdir, c, o in root_names(vol):
+                    if (b, x) == ("AUTOEXEC", "BAT"):
+                        print("the image already has an AUTOEXEC.BAT: kept (use --run to replace it)")
+                        run = False
+        if run is None:
+            run, cands = guess_run(vol, hint)
+            if not run: sys.exit("no program found to launch: say which one with --run \"NAME\"")
+            print("program to launch: %s   (candidates: %s)" % (" ; ".join(run), ", ".join(cands)))
+            if len(cands) > 1: print("  if it is the wrong one, run again with --run \"NAME\"")
+        if run:
+            delete_entry(vol, "AUTOEXEC.BAT")
+            add_bytes(vol, "AUTOEXEC", "BAT", ("\r\n".join(run) + "\r\n").encode("ascii"))
+        disk[voff:voff + len(vol)] = vol
+        open(out, "wb").write(disk)
+        print("%s created, %d bytes free" % (out, free_bytes(vol)))
         return
     if cmd == "new":
         if os.path.exists(path): sys.exit(path + " already exists")
