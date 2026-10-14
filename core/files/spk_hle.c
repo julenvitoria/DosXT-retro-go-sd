@@ -36,6 +36,8 @@ static FILE* spk_log;
 
 #define PIT_HZ 1193182.0
 #define SPK_AMP 12000.0
+/* no libm in the core: floor() compiles to one VRINTM on the M7, fmod() would not link */
+static double wrap(double c, double p) { return c - floor(c / p) * p; }
 
 static int16_t* out;
 static int nout, iout;
@@ -114,9 +116,8 @@ static void apply_pending(void) {
 	/* which edge is it: the end of a high half (r ~ hp) or of a low half (r ~ 0 / count)? */
 	double c = (pend_t - t0) * kclk;
 	double hp_old = floor((count + 1.0) / 2.0);
-	double r = fmod(c, count);
-	if (r < 0) r += count;
-	double d_hl = fabs(r - hp_old), d_lh = fmin(r, count - r);
+	double r = wrap(c, count);
+	double d_hl = (r > hp_old ? r - hp_old : hp_old - r), d_lh = r < count - r ? r : count - r;
 	count = pend_count;
 	if (d_hl < d_lh) t0 = pend_t - floor((count + 1.0) / 2.0) / kclk;  /* continue low */
 	else t0 = pend_t;                                                  /* continue high */
@@ -187,8 +188,7 @@ void spk_hle_pit2(uint8_t m, int32_t reload) {
 		double now = frame_abs + t;
 		double ph = (now - t0) * kclk;
 		double hp = floor((count + 1.0) / 2.0);
-		double r = fmod(ph, count), nb;
-		if (r < 0) r += count;
+		double r = wrap(ph, count), nb;
 		nb = (r < hp) ? ph - r + hp : ph - r + count;   /* clocks to the next edge */
 		pend_count = c; pend_t = t0 + nb / kclk; pend = 1;
 		return;
