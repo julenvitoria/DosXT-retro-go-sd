@@ -23,6 +23,7 @@
 #   fat12.py extract <img> [folder]            copy every file and folder out of the image
 #                                              (default folder: the image name without .img)
 #   add/ls/cat/extract also work on hard disk images; add accepts folders too
+#   fat12.py help [orden]                      pantalla de ayuda (también -h / --help)
 import sys, struct, os, time
 
 def geom(img):
@@ -322,9 +323,115 @@ def folder_bytes(path):
         for f in files: t += os.path.getsize(os.path.join(root, f))
     return t
 
+# ---- ayuda (fat12.py, fat12.py -h, fat12.py help <orden>) ----
+HELP_INTRO = """fat12.py - herramienta para imágenes de disco DOS (FAT12) de gw-dos y TinyEMU
+Disquetes y discos duros pequeños (hasta 16 MB). Solo necesita Python 3.
+
+Uso:  python3 fat12.py <orden> <argumentos...>
+      python3 fat12.py help <orden>      ayuda detallada de una orden
+
+Órdenes:"""
+
+HELP = [
+    ("ls", "ls <img>",
+     "Lista los archivos y carpetas de la imagen (raíz y subcarpetas).",
+     ["python3 fat12.py ls juego.img"]),
+    ("extract", "extract <img> [carpeta]",
+     "Copia todos los archivos y carpetas de la imagen a una carpeta del PC.\n"
+     "Si no indicas carpeta, usa el nombre de la imagen sin .img.",
+     ["python3 fat12.py extract loom.img", "python3 fat12.py extract loom.img loom_archivos"]),
+    ("cat", "cat <img> <NOMBRE.EXT>",
+     "Muestra un archivo de la imagen por pantalla (útil para AUTOEXEC.BAT).",
+     ["python3 fat12.py cat juego.img AUTOEXEC.BAT"]),
+    ("add", "add <img> <archivo|carpeta> [...]",
+     "Copia archivos o carpetas del PC dentro de la imagen (en la raíz;\n"
+     "cada carpeta se convierte en un subdirectorio).",
+     ["python3 fat12.py add juego.img GAME.EXE DATOS.DAT"]),
+    ("put", "put <img> <NOMBRE.EXT> <archivo>",
+     "Reescribe un archivo que ya existe en la imagen. Los datos nuevos deben\n"
+     "caber en el espacio que ya ocupaba.",
+     ["python3 fat12.py put juego.img AUTOEXEC.BAT autoexec.txt"]),
+    ("new", "new <img> [archivo ...]",
+     "Crea un disquete DOS vacío de 1,44 MB (opcionalmente con archivos).",
+     ["python3 fat12.py new vacio.img", "python3 fat12.py new juego.img GAME.EXE"]),
+    ("newhd", "newhd <img> [--size MB] [archivo|carpeta ...]",
+     "Crea una imagen de disco duro (particionada, FAT12, hasta 16 MB; por\n"
+     "defecto 16). Cada carpeta del PC pasa a ser un subdirectorio (C:\\LOOM).",
+     ["python3 fat12.py newhd c.img --size 8 loom", "python3 fat12.py newhd c.img loom monkey"]),
+    ("bootdisk", "bootdisk <Disk01.img> <a.img>",
+     "A partir del disco 1 de instalación de MS-DOS 6.x crea un disco de\n"
+     "arranque que se queda en A:\\> (sin el programa de instalación).",
+     ["python3 fat12.py bootdisk Disk01.img !BOOT.img"]),
+    ("sysdisk", "sysdisk <Disk01.img> <img> [--run \"orden\"] [archivo ...]",
+     "Disquete de 1,44 MB arrancable con un DOS mínimo (IO.SYS, MSDOS.SYS,\n"
+     "COMMAND.COM sacados de un disco de MS-DOS) más tus archivos. Con --run\n"
+     "escribe un AUTOEXEC.BAT que lanza esa orden.",
+     ["python3 fat12.py sysdisk Disk01.img alley.img --run \"ALLEYCAT\" ALLEYCAT.EXE"]),
+    ("todsk", "todsk <juego.img|carpeta> <JUEGO.dsk> [--run \"ORDEN;ORDEN\"]",
+     "Crea un .dsk para el core TinyEMU (dos386.bin). Copia la imagen, o la\n"
+     "construye desde una carpeta (disquete si cabe, si no disco duro), y\n"
+     "escribe el AUTOEXEC.BAT con el programa que el core arranca. Sin --run\n"
+     "intenta adivinar el programa y te dice cuál ha elegido; varias órdenes\n"
+     "se separan con ';'. Copia el .dsk (y su .cfg) a /roms/dos/.",
+     ["python3 fat12.py todsk alleycat.img ALLEYCAT.dsk",
+      "python3 fat12.py todsk loom LOOM.dsk",
+      "python3 fat12.py todsk rick2.img RICK2.dsk --run \"RICK2\"",
+      "python3 fat12.py todsk monkey MONKEY.dsk --run \"CD MONKEY;MONKEY\""]),
+]
+
+def print_help(cmd=None):
+    if cmd:
+        for name, syn, desc, ex in HELP:
+            if name == cmd:
+                print("Uso:  python3 fat12.py " + syn + "\n")
+                print(desc + "\n")
+                print("Ejemplos:")
+                for e in ex: print("  " + e)
+                return
+        print("orden desconocida: %s\n" % cmd)
+    print(HELP_INTRO)
+    short = {
+        "ls": "lista el contenido de una imagen",
+        "extract": "saca todos los archivos de una imagen a una carpeta",
+        "cat": "muestra un archivo de la imagen",
+        "add": "mete archivos o carpetas del PC en una imagen",
+        "put": "reescribe un archivo que ya está en la imagen",
+        "new": "crea un disquete vacío de 1,44 MB",
+        "newhd": "crea un disco duro (hasta 16 MB) desde carpetas",
+        "bootdisk": "disco de arranque desde el disco 1 de MS-DOS 6.x",
+        "sysdisk": "disquete arrancable con DOS mínimo + tu juego",
+        "todsk": "crea un .dsk para TinyEMU (dos386.bin)",
+    }
+    for name, syn, desc, ex in HELP:
+        print("  %-10s %s" % (name, short[name]))
+    print("\nls, cat, add y extract también funcionan con imágenes de disco duro.")
+    print("Ejemplo:  python3 fat12.py todsk alleycat.img ALLEYCAT.dsk")
+
+def need_args(cmd, n):
+    if len(sys.argv) < n:
+        print_help(cmd)
+        sys.exit(1)
+
 def main():
-    if len(sys.argv) < 3:
-        sys.exit(__doc__ or "see the comment at the top of fat12.py")
+    a = sys.argv[1:]
+    if not a or a[0] in ("-h", "--help", "help", "ayuda", "-?", "/?"):
+        print_help(a[1] if len(a) > 1 else None)
+        return
+    if len(a) > 1 and a[1] in ("-h", "--help"):
+        print_help(a[0])
+        return
+    cmd = a[0]
+    if cmd not in [h[0] for h in HELP]:
+        print_help(cmd)
+        sys.exit(1)
+    need_args(cmd, {"ls": 3, "extract": 3, "cat": 4, "add": 4, "put": 5, "new": 3,
+                    "newhd": 3, "bootdisk": 4, "sysdisk": 4, "todsk": 4}[cmd])
+    try:
+        run_cmd()
+    except FileNotFoundError as e:
+        sys.exit("no encuentro el archivo: %s" % e.filename)
+
+def run_cmd():
     cmd, path = sys.argv[1], sys.argv[2]
     if cmd == "sysdisk":
         args = sys.argv[3:]
@@ -349,7 +456,6 @@ def main():
         return
     if cmd == "todsk":
         args = sys.argv[3:]
-        if not args: sys.exit("usage: fat12.py todsk <game.img|folder> <GAME.dsk> [--run \"CMD;CMD\"]")
         out = args.pop(0); run = None
         if args and args[0] == "--run":
             args.pop(0); run = [c.strip() for c in args.pop(0).split(";") if c.strip()]
