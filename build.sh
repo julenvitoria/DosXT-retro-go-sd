@@ -30,7 +30,7 @@ print("/* Sergey Kiselev 8088 BIOS (GPLv3), https://github.com/skiselev/8088_bio
 print("#include <stdint.h>\nconst uint8_t bios_xt_rom[16384] = {"); print(",".join(str(x) for x in b)); print("};")
 EOF
 CORE=""; for f in $(cat "$HERE/core/core_sources.txt"); do CORE="$CORE $W/xt/$f"; done
-DEFS="-DXT_MINIMAL -DXT_NO_HOST_RENDER -DXT_TIMING_CATCHUP -DXT_IRQ_EVERY_INSTR -DXT_INT10_EXT -DXT_CGA_STATUS_ICOUNT -DXT_VGA_HLE -DXT_MOUSE_HLE -DXT_POOL_DEFAULT_SIZE=0"
+DEFS="-DXT_MINIMAL -DXT_NO_HOST_RENDER -DXT_TIMING_CATCHUP -DXT_IRQ_EVERY_INSTR -DXT_INT10_EXT -DXT_CGA_STATUS_ICOUNT -DXT_VGA_HLE -DXT_MOUSE_HLE -DXT_SPK_HLE -DXT_POOL_DEFAULT_SIZE=0"
 WARN="-Wall -Wno-unused -Wno-parentheses -Wno-attributes -Wno-format-truncation"
 
 # ---- 2. host test: the same frontend + core, on a fake firmware ----

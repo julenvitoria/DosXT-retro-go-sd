@@ -112,7 +112,7 @@ time   = keyboard          ; teclado en pantalla ("teclado"); "none"/"nada" = si
   espera a ver el prompt (`A:\>`) antes de cada orden. El disquete de `boot` debe acabar en el prompt
   (el de `fat12.py bootdisk` lo hace).
 - Si ningún botón queda como `keyboard`, TIME sigue abriendo el teclado en pantalla.
-- La barra inferior muestra el `.cfg` cargado; si alguna línea no se entiende indica cuántas ("N errores").
+- La franja de arriba muestra el `.cfg` cargado; si alguna línea no se entiende indica cuántas ("N errores").
 
 ## EGA y VGA
 
@@ -131,8 +131,8 @@ Rick Dangerous EGA). Los modos de texto y CGA siguen siendo los de siempre.
 La memoria de vídeo se resta de la RAM del DOS: con `vram = 64` quedan 624 KB, con **128 (por
 defecto)** 560 KB y con 256 quedan 432 KB. `video = cga` quita la EGA/VGA y deja los 640 KB enteros
 (para juegos que necesitan toda la memoria). Si un juego usa más memoria de vídeo de la que hay, la
-barra inferior lo avisa en rojo ("Falta memoria de video"): sube `vram` en su cfg. Mientras hay un
-modo EGA/VGA, la barra indica cuál y con cuánta memoria ("EGA 128K", "VGA 128K").
+franja inferior lo avisa en rojo ("Falta memoria de video"): sube `vram` en su cfg. Mientras hay un
+modo EGA/VGA, la franja inferior indica cuál y con cuánta memoria ("EGA 128K", "VGA 128K").
 
 No hay ROM de vídeo: los servicios de la BIOS EGA/VGA (INT 10h: modos, paleta, texto y píxeles en
 modos gráficos, detección) los da el propio emulador.
@@ -160,20 +160,22 @@ verdad (tras medio segundo, 20 veces por segundo).
 | START / SELECT (Zelda) | Tab / Retroceso | — |
 | PAUSE/SET | Menú de retro-go (volumen, brillo, salir...) | |
 
-Teclado en pantalla (5 filas en la franja inferior; manteniendo la cruceta el cursor sigue avanzando): letras, números, F1–F10, Ctrl/Alt/Shift
+Teclado en pantalla (4 filas: dos en la franja de arriba y dos en la de abajo, el juego no se mueve; manteniendo la cruceta el cursor sigue avanzando): letras, números, F1–F10, flechas, Inicio/Fin, Ins/Supr, Ctrl/Alt/Shift
 (se quedan "pulsadas" hasta la siguiente tecla, para Ctrl+C, Shift+letra, etc.) y teclas especiales:
 
-- **A:** menú de discos: lista los `.img` de la carpeta de la imagen arrancada y mete el elegido en A:
+- **A:** menú de discos (se abre encima de la imagen): lista los `.img` de la carpeta de la imagen arrancada y mete el elegido en A:
   (el DOS detecta el cambio de disco).
-- **CPU**: velocidad de la CPU emulada en MHz equivalentes de un 8088: 4,77 (IBM PC/XT), 8 (por defecto, Turbo XT), 10, 12, 16 y 20 MHz (aprox. 66.000 instrucciones/s por MHz). Al pulsarla se muestra un momento arriba; la barra inferior indica los MHz y la **carga** de la consola: si pasa de ~90 %, baja la velocidad.
-  instrucciones/s. La barra inferior muestra la **carga** de CPU de la consola: si pasa de ~90 %, baja la velocidad.
+- **CPU**: velocidad de la CPU emulada en MHz equivalentes de un 8088: 4,77 (IBM PC/XT), 8 (por defecto, Turbo XT), 10, 12, 16 y 20 MHz (aprox. 66.000 instrucciones/s por MHz). Al pulsarla se muestra un momento arriba; la franja inferior indica los MHz y la **carga** de la consola: si pasa de ~90 %, baja la velocidad.
 - **80c**: texto en 80 columnas: ventana de 40 columnas legible que sigue al cursor (por defecto)
   o la línea entera comprimida a letras de 4 píxeles.
 
-Pantalla: la imagen (320×200) ocupa la parte de arriba y la franja inferior de 40 píxeles muestra
-el estado o el teclado. Modos CGA: texto 40×25 y 80×25, gráficos 320×200 (4 colores) y 640×200
+Pantalla: la imagen (320×200) va centrada; las franjas de 20 píxeles de arriba y abajo muestran el
+estado (cfg y discos arriba; MHz, carga y avisos abajo) o el teclado. Modos CGA: texto 40×25 y 80×25, gráficos 320×200 (4 colores) y 640×200
 (2 colores); EGA/VGA: ver arriba.
-Sonido: altavoz del PC a 48 kHz.
+Sonido: altavoz del PC a 48 kHz, calculado a partir del puerto 61h y del canal 2 del PIT con la
+precisión de una instrucción y promediado en cada muestra (sin el zumbido ni las notas falsas de
+XTulator); también suena el altavoz manejado "a mano" (sonido digitalizado por el bit 1 del 61h).
+Con PAUSE/SET + cruceta se ven las barras de volumen y brillo de retro-go.
 
 ## Cómo está hecho
 

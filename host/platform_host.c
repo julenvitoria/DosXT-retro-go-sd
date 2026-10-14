@@ -104,7 +104,12 @@ static void shot(void) {
 
 void plat_present(void) {}
 
+/* GWDOS_WAV=file.raw: also dump the audio as raw 16-bit mono at PLAT_AUDIO_RATE */
 void plat_audio(const int16_t* s, int n) {
+    static FILE* wav = NULL;
+    static int wav_tried = 0;
+    if (!wav_tried) { const char* w = getenv("GWDOS_WAV"); wav_tried = 1; if (w) wav = fopen(w, "wb"); }
+    if (wav) fwrite(s, sizeof(int16_t), (size_t)n, wav);
     for (int i = 0; i < n; i++) audio_energy += (double)s[i] * s[i];
     audio_samples += n;
 }

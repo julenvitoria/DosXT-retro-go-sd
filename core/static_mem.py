@@ -326,4 +326,20 @@ wr("cpu/cpu.h", h)
 m = rd("machine.c")
 m = sub(m, "\ti8259_init(&machine->i8259);", "\ti8259_init(&machine->i8259);\n\tcpu_pic = &machine->i8259;")
 wr("machine.c", m)
+# XT_SPK_HLE: PC speaker computed from port 61h and PIT channel 2, timed to the instruction
+# and box-filtered per output sample (spk_hle.c). XTulator's own 48 kHz speaker timer goes.
+shutil.copy(os.path.join(here, "files", "spk_hle.c"), os.path.join(d, "spk_hle.c"))
+c = rd("chipset/i8255.c")
+c = sub(c, "\tcase 1:\n\t\tif (value & 0x01) {", "\tcase 1:\n#ifdef XT_SPK_HLE\n\t\t{ void spk_hle_port61(uint8_t v); spk_hle_port61(value); }\n#endif\n\t\tif (value & 0x01) {")
+wr("chipset/i8255.c", c)
+c = rd("chipset/i8253.c")
+c = sub(c, "\t\tif (loaded) switch (i8253->mode[portnum]) {",
+           "#ifdef XT_SPK_HLE\n\t\tif (loaded && portnum == 2) { void spk_hle_pit2(uint8_t m, int32_t reload); spk_hle_pit2(i8253->mode[2], i8253->reload[2]); }\n#endif\n\t\tif (loaded) switch (i8253->mode[portnum]) {")
+c = sub(c, "\t\t\ti8253->bcd[sel] = value & 1;",
+           "\t\t\ti8253->bcd[sel] = value & 1;\n#ifdef XT_SPK_HLE\n\t\t\tif (sel == 2) { void spk_hle_pit2_mode(uint8_t m); spk_hle_pit2_mode(i8253->mode[2]); }\n#endif")
+wr("chipset/i8253.c", c)
+c = rd("modules/audio/pcspeaker.c")
+c = sub(c, "\ttiming_addTimer(pcspeaker_callback, spk, SAMPLE_RATE, TIMING_ENABLED);",
+           "#ifndef XT_SPK_HLE\n\ttiming_addTimer(pcspeaker_callback, spk, SAMPLE_RATE, TIMING_ENABLED);\n#endif")
+wr("modules/audio/pcspeaker.c", c)
 print("phase 3 static-memory patches applied")
