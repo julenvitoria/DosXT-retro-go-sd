@@ -26,6 +26,13 @@
 */
 #include <stdint.h>
 #include <math.h>
+#ifdef SPK_LOG                           /* host debugging only: every speaker event to spk.log */
+#include <stdio.h>
+static FILE* spk_log;
+#define LOG(...) do { if (!spk_log) spk_log = fopen("spk.log", "w"); fprintf(spk_log, __VA_ARGS__); } while (0)
+#else
+#define LOG(...) do { } while (0)
+#endif
 
 #define PIT_HZ 1193182.0
 #define SPK_AMP 12000.0
@@ -45,6 +52,12 @@ static uint32_t chunk_done, chunk_len;
 static uint8_t data_bit, gate_bit, mode = 3, loaded;
 static double count = 65536.0;           /* PIT clocks */
 static double t0;                        /* absolute instruction where counting started */
+/* A count written while mode 3 is running takes effect at the end of the current half
+   cycle, as on the 8253 -- it does NOT restart the wave. Monkey Island rewrites the same
+   count on every timer tick (~400 times a second); restarting there chopped every note
+   longer than ~2.5 ms into a buzz at the tick rate. */
+static double pend_count, pend_t;
+static uint8_t pend;
 
 /* output filtering */
 static double dc, lp;
@@ -96,14 +109,32 @@ static void emit(double v) {
 	iout++;
 }
 
+/* switch to the pending count at its half-cycle boundary, keeping the polarity */
+static void apply_pending(void) {
+	/* which edge is it: the end of a high half (r ~ hp) or of a low half (r ~ 0 / count)? */
+	double c = (pend_t - t0) * kclk;
+	double hp_old = floor((count + 1.0) / 2.0);
+	double r = fmod(c, count);
+	if (r < 0) r += count;
+	double d_hl = fabs(r - hp_old), d_lh = fmin(r, count - r);
+	count = pend_count;
+	if (d_hl < d_lh) t0 = pend_t - floor((count + 1.0) / 2.0) / kclk;  /* continue low */
+	else t0 = pend_t;                                                  /* continue high */
+	pend = 0;
+}
+
 static void advance_to(double t) {
 	if (!out) return;
 	if (t > frame_len) t = frame_len;
 	while (pos < t && iout < nout) {
 		double b = frame_len * (iout + 1) / nout;   /* end of the current sample */
 		double e = t < b ? t : b;
+		double pr = pend ? pend_t - (double)frame_abs : 1e300;
+		if (pend && pr <= pos) { apply_pending(); continue; }
+		if (pr < e) e = pr;
 		acc += level_integral(frame_abs + pos, frame_abs + e);
 		pos = e;
+		if (pend && pos >= pr) apply_pending();
 		if (pos >= b) {
 			double span = frame_len / nout;
 			emit(acc / span);
@@ -134,25 +165,46 @@ void spk_hle_frame_end(void) {
 
 void spk_hle_port61(uint8_t v) {
 	double t = now_rel();
+	LOG("%.0f P61 %02x\n", frame_abs + t, v);
 	advance_to(t);
 	uint8_t g = v & 1;
-	if (g && !gate_bit) t0 = frame_abs + t;   /* gate rising: the counter restarts / triggers */
+	if (g && !gate_bit) {                      /* gate rising: the counter restarts / triggers */
+		t0 = frame_abs + t;
+		if (pend) { count = pend_count; pend = 0; }
+	}
 	gate_bit = g;
 	data_bit = (v >> 1) & 1;
 }
 
 void spk_hle_pit2(uint8_t m, int32_t reload) {
 	double t = now_rel();
+	LOG("%.0f LOAD m%u %d\n", frame_abs + t, m, (int)reload);
 	advance_to(t);
+	double c = reload > 0 ? (double)reload : 65536.0;
+	if (loaded && m == 3 && mode == 3 && gate_bit && count >= 2 && c >= 2) {
+		/* running square wave: the new count starts at the next half-cycle boundary */
+		if (c == count && !pend) return;
+		double now = frame_abs + t;
+		double ph = (now - t0) * kclk;
+		double hp = floor((count + 1.0) / 2.0);
+		double r = fmod(ph, count), nb;
+		if (r < 0) r += count;
+		nb = (r < hp) ? ph - r + hp : ph - r + count;   /* clocks to the next edge */
+		pend_count = c; pend_t = t0 + nb / kclk; pend = 1;
+		return;
+	}
 	mode = m;
-	count = reload > 0 ? (double)reload : 65536.0;
+	count = c;
 	loaded = 1;
+	pend = 0;
 	t0 = frame_abs + t;
 }
 
 void spk_hle_pit2_mode(uint8_t m) {
 	double t = now_rel();
+	LOG("%.0f MODE m%u\n", frame_abs + t, m);
 	advance_to(t);
 	mode = m;
 	loaded = 0;
+	pend = 0;
 }
