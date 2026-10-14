@@ -99,7 +99,11 @@ uint32_t plat_buttons(void) {
 
 uint8_t* plat_framebuffer(void) { return (uint8_t*)lcd_get_active_buffer(); }
 
-void plat_present(void) { lcd_swap(); }
+/* Retro-go's in-game HUD (volume / brightness bars from PAUSE/SET + a direction,
+   low-battery blink) is drawn into the active buffer, so after our whole frame
+   and right before the swap. common_emu_input_loop() already changes the level;
+   without this call the change just had no picture. */
+void plat_present(void) { common_ingame_overlay(); lcd_swap(); }
 
 void plat_audio(const int16_t* s, int n) {
     if (common_emu_sound_loop_is_muted()) {
