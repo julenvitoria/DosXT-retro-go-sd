@@ -3,8 +3,10 @@
   Shared by the retro-go external core (platform_core.c) and the PC test harness (host/).
   GPLv2 or later (XTulator is GPLv2+); the embedded BIOS is GPLv3 (Sergey Kiselev).
 
-  Screen (320x240, 8-bit indexed): CGA picture on lines 0..199, frontend bar on 200..239
-  (status line, or the on-screen keyboard / disk menu).
+  Screen (320x240, 8-bit indexed): the PC picture centred on lines 20..219; the 20-line
+  bands above and below carry the status lines, or the on-screen keyboard (two rows of
+  keys in each band, so the game never moves or shrinks). The disk menu opens over the
+  picture.
 
   Buttons, normal mode:  D-pad = arrow keys, A = Enter, B = Space, GAME = Esc,
                          X (START) = Tab, Y (SELECT) = Backspace, TIME = on-screen keyboard.
@@ -106,12 +108,19 @@ static void key_tap(uint8_t sc) { key_push(sc); key_push(sc | 0x80); }
 #define SC_CPU  0xF1
 #define SC_ZOOM 0xF2
 typedef struct { const char* label; uint8_t sc; } OSK_KEY;
-static const OSK_KEY osk_r0[] = { {"Esc",0x01},{"1",0x02},{"2",0x03},{"3",0x04},{"4",0x05},{"5",0x06},{"6",0x07},{"7",0x08},{"8",0x09},{"9",0x0A},{"0",0x0B},{"-",0x0C},{"=",0x0D},{"\x1B-",0x0E},{NULL,0} };
-static const OSK_KEY osk_r1[] = { {"Tab",0x0F},{"Q",0x10},{"W",0x11},{"E",0x12},{"R",0x13},{"T",0x14},{"Y",0x15},{"U",0x16},{"I",0x17},{"O",0x18},{"P",0x19},{"[",0x1A},{"]",0x1B},{"Ent",0x1C},{NULL,0} };
-static const OSK_KEY osk_r2[] = { {"Ctl",0x1D},{"A",0x1E},{"S",0x1F},{"D",0x20},{"F",0x21},{"G",0x22},{"H",0x23},{"J",0x24},{"K",0x25},{"L",0x26},{";",0x27},{"'",0x28},{"\\",0x2B},{"`",0x29},{"80c",SC_ZOOM},{NULL,0} };
-static const OSK_KEY osk_r3[] = { {"Shf",0x2A},{"Z",0x2C},{"X",0x2D},{"C",0x2E},{"V",0x2F},{"B",0x30},{"N",0x31},{"M",0x32},{",",0x33},{".",0x34},{"/",0x35},{"Alt",0x38},{"Spc",0x39},{NULL,0} };
-static const OSK_KEY osk_r4[] = { {"F1",0x3B},{"F2",0x3C},{"F3",0x3D},{"F4",0x3E},{"F5",0x3F},{"F6",0x40},{"F7",0x41},{"F8",0x42},{"F9",0x43},{"F10",0x44},{"A:",SC_DISK},{"CPU",SC_CPU},{"Del",0x53},{"Ins",0x52},{NULL,0} };
-static const OSK_KEY* const osk_rows[5] = { osk_r0, osk_r1, osk_r2, osk_r3, osk_r4 };
+/* four rows: 0-1 in the band above the picture, 2-3 in the band below. A key is
+   label x 8 + 4 pixels wide; every row fits in 320. */
+static const OSK_KEY osk_r0[] = { {"Esc",0x01},{"1",0x02},{"2",0x03},{"3",0x04},{"4",0x05},{"5",0x06},{"6",0x07},{"7",0x08},{"8",0x09},{"9",0x0A},{"0",0x0B},{"-",0x0C},{"=",0x0D},{"\x1B-",0x0E},
+                                  {"F1",0x3B},{"F2",0x3C},{"F3",0x3D},{"F4",0x3E},{"F5",0x3F},{"F6",0x40},{NULL,0} };
+static const OSK_KEY osk_r1[] = { {"Tab",0x0F},{"Q",0x10},{"W",0x11},{"E",0x12},{"R",0x13},{"T",0x14},{"Y",0x15},{"U",0x16},{"I",0x17},{"O",0x18},{"P",0x19},{"[",0x1A},{"]",0x1B},{"Ent",0x1C},
+                                  {"F7",0x41},{"F8",0x42},{"F9",0x43},{"F10",0x44},{"Del",0x53},{NULL,0} };
+static const OSK_KEY osk_r2[] = { {"Ctl",0x1D},{"A",0x1E},{"S",0x1F},{"D",0x20},{"F",0x21},{"G",0x22},{"H",0x23},{"J",0x24},{"K",0x25},{"L",0x26},{";",0x27},{"'",0x28},{"\\",0x2B},{"`",0x29},
+                                  {"Ins",0x52},{"80c",SC_ZOOM},{"CPU",SC_CPU},{"A:",SC_DISK},{NULL,0} };
+static const OSK_KEY osk_r3[] = { {"Shf",0x2A},{"Z",0x2C},{"X",0x2D},{"C",0x2E},{"V",0x2F},{"B",0x30},{"N",0x31},{"M",0x32},{",",0x33},{".",0x34},{"/",0x35},{"Alt",0x38},{"Spc",0x39},
+                                  {"\x18",0x48},{"\x19",0x50},{"\x1B",0x4B},{"\x1A",0x4D},{"Hom",0x47},{"End",0x4F},{NULL,0} };
+#define OSK_ROWS 4
+static const OSK_KEY* const osk_rows[OSK_ROWS] = { osk_r0, osk_r1, osk_r2, osk_r3 };
+static const int osk_row_y[OSK_ROWS] = { 2, 11, 221, 230 };
 
 static int ui_mode = 0;                   /* 0 status bar, 1 keyboard, 2 disk menu */
 static int osk_row = 1, osk_col = 1;
@@ -123,7 +132,7 @@ static int key_x(int r, int c) { int x = 0; for (int i = 0; i < c; i++) x += key
 
 static void osk_move_row(int dr) {
     int cx = key_x(osk_row, osk_col) + key_w(&osk_rows[osk_row][osk_col]) / 2;
-    osk_row = (osk_row + dr + 5) % 5;
+    osk_row = (osk_row + dr + OSK_ROWS) % OSK_ROWS;
     int best = 0, bestd = 1 << 30;
     for (int c = 0; c < row_len(osk_row); c++) {
         int m = key_x(osk_row, c) + key_w(&osk_rows[osk_row][c]) / 2;
@@ -303,15 +312,17 @@ static void handle_input(uint32_t b) {
     prev_buttons = b;
 }
 
-/* ---- bottom bar ---- */
+/* ---- the bands above and below the picture ---- */
+#define PIC_Y 20                          /* the PC picture: lines 20..219 */
 static uint32_t load_pct = 0;
 
-static void draw_bar(uint8_t* fb) {
+static void draw_bands(uint8_t* fb) {
     char line[48];
-    ui_fill(fb, 0, 200, 320, 40, 0);
+    ui_fill(fb, 0, 0, 320, PIC_Y, 0);
+    ui_fill(fb, 0, PIC_Y + 200, 320, 240 - PIC_Y - 200, 0);
     if (ui_mode == 1) {
-        for (int r = 0; r < 5; r++) {
-            int x = 0;
+        for (int r = 0; r < OSK_ROWS; r++) {
+            int x = 0, y = osk_row_y[r];
             for (int c = 0; osk_rows[r][c].label; c++) {
                 const OSK_KEY* k = &osk_rows[r][c];
                 int w = key_w(k);
@@ -319,36 +330,41 @@ static void draw_bar(uint8_t* fb) {
                 if ((k->sc == 0x2A && latched_shift) || (k->sc == 0x1D && latched_ctrl) || (k->sc == 0x38 && latched_alt)) bg = 4;
                 if (k->sc >= 0xF0) bg = 2;
                 if (r == osk_row && c == osk_col) { bg = 14; fg = 0; }
-                ui_fill(fb, x, 200 + r * 8, w - 1, 8, bg);
-                ui_text(fb, x + 2, 200 + r * 8, k->label, fg, bg);
+                ui_fill(fb, x, y, w - 1, 8, bg);
+                ui_text(fb, x + 2, y, k->label, fg, bg);
                 x += w;
             }
         }
     } else if (ui_mode == 2) {
-        ui_text(fb, 0, 200, "Disco para A:  (A=insertar  B=volver)", 14, 0);
+        /* disk menu: a list over the picture, the title in the band above */
+        ui_text(fb, 0, 6, "Disco para A:  (A=insertar  B=volver)", 14, 0);
+        ui_fill(fb, 0, PIC_Y, 320, 200, 0);
         if (!n_images) {
             char msg[48];
             snprintf(msg, sizeof(msg), "No hay .img en %.24s", dos_dir);
-            ui_text(fb, 0, 208, msg, 12, 0);
+            ui_text(fb, 8, PIC_Y + 8, msg, 12, 0);
         }
-        int first = disk_sel - 1 < 0 ? 0 : disk_sel - 1;
-        for (int i = 0; i < 4 && first + i < n_images; i++) {
-            int sel = first + i == disk_sel;
-            ui_fill(fb, 0, 208 + i * 8, 320, 8, sel ? 1 : 0);
-            ui_text(fb, 8, 208 + i * 8, images[first + i], sel ? 15 : 7, sel ? 1 : 0);
+        const int vis = 19;                         /* entries that fit, 10 lines apart */
+        int first = disk_sel - vis / 2;
+        if (first > n_images - vis) first = n_images - vis;
+        if (first < 0) first = 0;
+        for (int i = 0; i < vis && first + i < n_images; i++) {
+            int sel = first + i == disk_sel, y = PIC_Y + 6 + i * 10;
+            ui_fill(fb, 0, y - 1, 320, 10, sel ? 1 : 0);
+            ui_text(fb, 8, y, images[first + i], sel ? 15 : 7, sel ? 1 : 0);
         }
     } else {
         if (cfg_name[0]) {
             snprintf(line, sizeof(line), gcfg.errors ? "cfg: %.24s (%d errores)" : "cfg: %.24s", cfg_name, gcfg.errors);
-            ui_text(fb, 0, 204, line, gcfg.errors ? 12 : 10, 0);
+            ui_text(fb, 0, 2, line, gcfg.errors ? 12 : 10, 0);
         } else {
-            ui_text(fb, 0, 204, "A=Intro B=Espacio GAME=Esc TIME=Teclado", 7, 0);
+            ui_text(fb, 0, 2, "A=Intro B=Espacio GAME=Esc TIME=Teclado", 7, 0);
         }
         if (drive_b[0])
             snprintf(line, sizeof(line), "A:%.11s B:%.11s C:%.9s", drive_a[0] ? drive_a : "-", drive_b, drive_c[0] ? drive_c : "-");
         else
             snprintf(line, sizeof(line), "A:%.14s C:%.14s", drive_a[0] ? drive_a : "-", drive_c[0] ? drive_c : "-");
-        ui_text(fb, 0, 216, line, 3, 0);
+        ui_text(fb, 0, 11, line, 3, 0);
         snprintf(line, sizeof(line), "8088 %s MHz  carga %u%%", speeds[speed_idx].mhz, (unsigned)load_pct);
 #ifdef XT_VGA_HLE
         extern uint32_t vga_dbg_drop;
@@ -356,11 +372,10 @@ static void draw_bar(uint8_t* fb) {
             size_t l = strlen(line);
             snprintf(line + l, sizeof(line) - l, "  %s %uK", vga_hle_is256() ? "VGA" : "EGA", (unsigned)(vga_plane_size / 256));
         }
-        if (vga_dbg_drop > 64) {                         /* the game used more video memory than there is */
-            ui_text(fb, 0, 228, vga_plane_size < 65536 ? "Falta memoria de video: vram = 256 en cfg" : "Falta memoria de video", 12, 0);
-        } else
+        if (vga_dbg_drop > 64)                           /* the game used more video memory than there is */
+            ui_text(fb, 0, 230, vga_plane_size < 65536 ? "Falta memoria de video: vram = 256 en cfg" : "Falta memoria de video", 12, 0);
 #endif
-        ui_text(fb, 0, 228, line, 8, 0);
+        ui_text(fb, 0, 221, line, 8, 0);
     }
 }
 
@@ -377,26 +392,46 @@ static int16_t speaker_sample(void) {
     return (int16_t)s;
 }
 
+#ifdef XT_SPK_HLE
+void spk_hle_frame_begin(const uint64_t* exec, uint32_t instructions, uint32_t ips, int16_t* buf, int n);
+void spk_hle_chunk(uint32_t done, uint32_t len);
+void spk_hle_frame_end(void);
+#endif
+
 static void run_frame(void) {
     const uint32_t chunk = instructionsperloop;
     const uint32_t target = ips / PLAT_FPS;
     int si = 0;
+#ifdef XT_SPK_HLE
+    /* the speaker is rendered from the guest's port writes, timed to the instruction */
+    spk_hle_frame_begin(&machine.CPU.totalexec, (target + chunk - 1) / chunk * chunk, ips, audio, PLAT_AUDIO_SAMPLES);
+#endif
     for (uint32_t done = 0; done < target; done += chunk) {
         cpu_interruptCheck(&machine.CPU, &machine.i8259);
+#ifdef XT_SPK_HLE
+        spk_hle_chunk(done, chunk);
+#endif
         cpu_exec(&machine.CPU, chunk);
         uint32_t t = chunk * 1000000u + vt_rem;            /* advance virtual time */
         timing_virtual_us += t / ips;
         vt_rem = t % ips;
         timing_loop();
+#ifndef XT_SPK_HLE
         au_rem += chunk * PLAT_AUDIO_RATE;                 /* audio at 48 kHz of virtual time */
         while (au_rem >= ips) {
             au_rem -= ips;
             if (si < PLAT_AUDIO_SAMPLES) audio[si++] = speaker_sample();
         }
+#endif
         key_pump(chunk);
     }
+#ifdef XT_SPK_HLE
+    spk_hle_frame_end();
+    (void)si;
+#else
     int16_t last = si ? audio[si - 1] : 0;
     while (si < PLAT_AUDIO_SAMPLES) audio[si++] = last;
+#endif
     cga_doDraw = 0;
 }
 
@@ -647,14 +682,14 @@ static void update_palette(int force) {
 
 static void draw_screen(uint8_t* fb) {
 #ifdef XT_VGA_HLE
-    if (machine_ok && vga_active) vga_hle_render(fb, 16);
+    if (machine_ok && vga_active) vga_hle_render(fb + PIC_Y * 320, 16);
     else
 #endif
-    if (machine_ok) cga_render(fb, 0);
+    if (machine_ok) cga_render(fb, PIC_Y);
     else {
-        ui_fill(fb, 0, 0, 320, 200, 0);
-        ui_text(fb, 8, 80, "gw-dos: sin memoria para el PC", 12, 0);
-        ui_text(fb, 8, 96, "(no se pudo iniciar la maquina)", 7, 0);
+        ui_fill(fb, 0, PIC_Y, 320, 200, 0);
+        ui_text(fb, 8, PIC_Y + 80, "gw-dos: sin memoria para el PC", 12, 0);
+        ui_text(fb, 8, PIC_Y + 96, "(no se pudo iniciar la maquina)", 7, 0);
     }
 #ifdef XT_MOUSE_HLE
     int cx, cy;
@@ -664,22 +699,23 @@ static void draw_screen(uint8_t* fb) {
         for (int j = 0; j < 11; j++) for (int i = 0; i < 8; i++) {
             int x = cx + i, y = cy + j;
             if (x < 0 || x >= 320 || y < 0 || y >= 200) continue;
+            y += PIC_Y;
             if (arrow[j] & (0x8000 >> i)) fb[y * 320 + x] = ui_cmap[0];
             else if (fill[j] & (0x8000 >> i)) fb[y * 320 + x] = ui_cmap[15];
         }
     }
 #endif
-    if (osd_frames) {
+    draw_bands(fb);
+    if (osd_frames) {                               /* CPU speed change: over the band above */
         char msg[48];
         osd_frames--;
         snprintf(msg, sizeof(msg), " CPU: 8088 a %s MHz%s%s ", speeds[speed_idx].mhz,
                  speeds[speed_idx].pc[0] ? " - " : "", speeds[speed_idx].pc);
         int w = (int)strlen(msg) * 8;
         if (w > 320) w = 320;
-        ui_fill(fb, (320 - w) / 2 - 2, 2, w + 4, 12, 15);
-        ui_text(fb, (320 - w) / 2, 4, msg, 0, 15);
+        ui_fill(fb, (320 - w) / 2 - 2, 4, w + 4, 12, 15);
+        ui_text(fb, (320 - w) / 2, 6, msg, 0, 15);
     }
-    draw_bar(fb);
 }
 
 #ifdef GWDOS_HOST
