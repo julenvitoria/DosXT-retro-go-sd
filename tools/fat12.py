@@ -15,7 +15,9 @@
 #   fat12.py newhd <img> [--size MB] [file|folder ...]
 #                                              hard disk image (partitioned, FAT12, up to 16 MB);
 #                                              each PC folder becomes a subdirectory (e.g. C:\\LOOM)
-#   add/ls/cat also work on hard disk images; add accepts folders too
+#   fat12.py extract <img> [folder]            copy every file and folder out of the image
+#                                              (default folder: the image name without .img)
+#   add/ls/cat/extract also work on hard disk images; add accepts folders too
 import sys, struct, os, time
 
 def geom(img):
@@ -314,6 +316,26 @@ def main():
                     print("%-24s %8d  attr=%02X" % (prefix + n, size, e[11]))
         walk(0, "")
         print("%d bytes free" % free_bytes(img))
+    elif cmd == "extract":
+        dest = sys.argv[3] if len(sys.argv) > 3 else os.path.splitext(os.path.basename(path))[0]
+        count = [0, 0]
+        def walk(dc, outdir):
+            os.makedirs(outdir, exist_ok=True)
+            for off in dir_slot_offsets(img, dc):
+                e = img[off:off + 32]
+                if e[0] == 0: break
+                if e[0] == 0xE5 or e[11] & 0x08 or e[0] == 0x2E: continue
+                n = e[0:8].decode("cp437").rstrip() + ("." + e[8:11].decode("cp437").rstrip() if e[8:11].strip() else "")
+                clus, size = struct.unpack_from("<HI", e, 26)
+                target = os.path.join(outdir, n)
+                if e[11] & 0x10:
+                    walk(clus, target)
+                else:
+                    buf = b"".join(img[data + (c - 2) * csize: data + (c - 1) * csize] for c in chain(img, clus))
+                    with open(target, "wb") as fh: fh.write(buf[:size])
+                    count[0] += 1; count[1] += size
+        walk(0, dest)
+        print("%d files (%d bytes) extracted to %s" % (count[0], count[1], dest))
     elif cmd == "cat":
         off, clus, size = find(img, sys.argv[3])
         buf = b"".join(img[data + (c - 2) * csize: data + (c - 1) * csize] for c in chain(img, clus))
