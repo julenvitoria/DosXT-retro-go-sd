@@ -316,6 +316,29 @@ static void handle_input(uint32_t b) {
 #define PIC_Y 20                          /* the PC picture: lines 20..219 */
 static uint32_t load_pct = 0;
 
+/* ---- speed governor ----
+   The chosen speed is a CEILING. If the console cannot emulate that many instructions per
+   frame in real time, frames run late, retro-go's audio buffer drains between them and the
+   PC speaker crackles and stutters (Monkey Island at 16 MHz). So when fewer than ~58 frames
+   a second get through, the emulated CPU is slowed down to what fits, and sped up again
+   (never past the chosen speed) once there is headroom. Virtual time follows ips, so the
+   PIT -- music tempo and note pitch -- stays right; only CPU-bound game logic runs slower,
+   exactly as if a slower speed had been picked by hand. */
+#define IPS_MIN 300000u
+static void speed_governor(uint32_t frames, uint32_t ms, uint32_t load) {
+    uint32_t ceiling = speeds[speed_idx].ips;
+    if (!ms || ms > 1500) return;      /* a long stall is retro-go's menu or a disk load, not speed */
+    uint32_t fps10 = frames * 10000u / ms;                 /* frames/s x 10 */
+    if (fps10 < 575) {                                      /* falling behind: fit to 90 % */
+        uint64_t n = (uint64_t)ips * fps10 / 600u * 90u / 100u;
+        ips = n < IPS_MIN ? IPS_MIN : (uint32_t)n;
+    } else if (ips < ceiling && load < 75) {                /* headroom: creep back up */
+        uint32_t n = ips + ips / 10;
+        ips = n > ceiling ? ceiling : n;
+    }
+    if (ips > ceiling) ips = ceiling;
+}
+
 static void draw_bands(uint8_t* fb) {
     char line[48];
     ui_fill(fb, 0, 0, 320, PIC_Y, 0);
@@ -365,7 +388,11 @@ static void draw_bands(uint8_t* fb) {
         else
             snprintf(line, sizeof(line), "A:%.14s C:%.14s", drive_a[0] ? drive_a : "-", drive_c[0] ? drive_c : "-");
         ui_text(fb, 0, 11, line, 3, 0);
-        snprintf(line, sizeof(line), "8088 %s MHz  carga %u%%", speeds[speed_idx].mhz, (unsigned)load_pct);
+        if (ips < speeds[speed_idx].ips) {               /* the governor has slowed it down */
+            unsigned m10 = (unsigned)((ips + 3300) / 6600);  /* ~66,000 instr/s per MHz */
+            snprintf(line, sizeof(line), "8088 %s->%u.%u MHz  carga %u%%", speeds[speed_idx].mhz, m10 / 10, m10 % 10, (unsigned)load_pct);
+        } else
+            snprintf(line, sizeof(line), "8088 %s MHz  carga %u%%", speeds[speed_idx].mhz, (unsigned)load_pct);
 #ifdef XT_VGA_HLE
         extern uint32_t vga_dbg_drop;
         if (vga_active) {                                /* video mode and memory */
@@ -803,7 +830,7 @@ int dos_main(int start_paused) {
 
     if (ok) insert_boot_disks();
 
-    uint32_t sec_t0 = plat_ms(), emu_ms = 0, frame_no = 0;
+    uint32_t sec_t0 = plat_ms(), emu_ms = 0, frame_no = 0, win_frames = 0;
     for (;;) {
         bool draw = plat_frame_begin();
         /* the LCD switches to 8-bit mode at a vsync and the CLUT is ignored until then:
@@ -821,7 +848,12 @@ int dos_main(int start_paused) {
             memset(audio, 0, sizeof(audio));
         }
         uint32_t now = plat_ms();
-        if (now - sec_t0 >= 1000) { load_pct = emu_ms * 100u / (now - sec_t0); emu_ms = 0; sec_t0 = now; }
+        win_frames++;
+        if (now - sec_t0 >= 500) {                     /* every half second: load and speed */
+            load_pct = emu_ms * 100u / (now - sec_t0);
+            if (ok) speed_governor(win_frames, now - sec_t0, load_pct);
+            emu_ms = 0; win_frames = 0; sec_t0 = now;
+        }
         if (draw) {
             draw_screen(plat_framebuffer());
             plat_present();
