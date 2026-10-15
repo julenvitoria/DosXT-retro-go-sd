@@ -22,6 +22,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#ifdef GWDOS_HOST
+#include <stdlib.h>
+#endif
 #include "platform.h"
 #ifndef GWDOS_CFG_DIR
 #define GWDOS_CFG_DIR "/cores/dos"     /* per-game .cfg files */
@@ -329,13 +332,15 @@ static void speed_governor(uint32_t frames, uint32_t ms, uint32_t load) {
     uint32_t ceiling = speeds[speed_idx].ips;
     if (!ms || ms > 1500) return;      /* a long stall is retro-go's menu or a disk load, not speed */
     uint32_t fps10 = frames * 10000u / ms;                 /* frames/s x 10 */
-    if (fps10 < 575) {                                      /* falling behind: fit to 90 % */
-        uint64_t n = (uint64_t)ips * fps10 / 600u * 90u / 100u;
-        ips = n < IPS_MIN ? IPS_MIN : (uint32_t)n;
-    } else if (ips < ceiling && load < 75) {                /* headroom: creep back up */
-        uint32_t n = ips + ips / 10;
-        ips = n > ceiling ? ceiling : n;
-    }
+    /* Two signals. Frames lost (< 57.5/s) is the obvious one, but throttled by that alone
+       (16->11.2 MHz) Monkey Island still sounded wrong on the console: fitting the AVERAGE
+       frame leaves no room for the frames that cost more, and then the render and the audio
+       hand-off land late. So the emulation's own share of the time is held at ~70 % too. */
+    uint64_t n = ips;
+    if (fps10 < 575) n = n * fps10 / 600u;
+    if (load > 80) n = n * 70u / load;
+    else if (fps10 >= 575 && load < 55 && ips < ceiling) n = n + n / 10;   /* headroom */
+    ips = n < IPS_MIN ? IPS_MIN : (uint32_t)n;
     if (ips > ceiling) ips = ceiling;
 }
 
@@ -426,14 +431,22 @@ void spk_hle_frame_end(void);
 #endif
 
 static void run_frame(void) {
-    const uint32_t chunk = instructionsperloop;
-    const uint32_t target = ips / PLAT_FPS;
+    /* exactly ips/60 instructions per frame on average: the remainder carries over and the
+       last block is shortened. Rounding every frame up to whole blocks of 100 ran the
+       guest's clock fast against the audio at any speed that is not a multiple of 6000
+       instructions/s -- the speed governor's in-between speeds -- and every note came out
+       up to 0.7 % sharp. */
+    static uint32_t frame_rem = 0;
+    const uint32_t total = ips + frame_rem;
+    const uint32_t target = total / PLAT_FPS;
+    frame_rem = total % PLAT_FPS;
     int si = 0;
 #ifdef XT_SPK_HLE
     /* the speaker is rendered from the guest's port writes, timed to the instruction */
-    spk_hle_frame_begin(&machine.CPU.totalexec, (target + chunk - 1) / chunk * chunk, ips, audio, PLAT_AUDIO_SAMPLES);
+    spk_hle_frame_begin(&machine.CPU.totalexec, target, ips, audio, PLAT_AUDIO_SAMPLES);
 #endif
-    for (uint32_t done = 0; done < target; done += chunk) {
+    for (uint32_t done = 0; done < target; done += instructionsperloop) {
+        const uint32_t chunk = target - done < instructionsperloop ? target - done : instructionsperloop;
         cpu_interruptCheck(&machine.CPU, &machine.i8259);
 #ifdef XT_SPK_HLE
         spk_hle_chunk(done, chunk);
@@ -848,6 +861,14 @@ int dos_main(int start_paused) {
             memset(audio, 0, sizeof(audio));
         }
         uint32_t now = plat_ms();
+#ifdef GWDOS_HOST
+        {   /* host harness: GWDOS_IPS_AT=frame:ips changes the CPU speed mid-run, as the
+               governor does on the console (the harness is not real time) */
+            static long at = -2; static uint32_t to;
+            if (at == -2) { const char* e = getenv("GWDOS_IPS_AT"); at = -1; if (e) { at = atol(e); const char* c = strchr(e, ':'); to = c ? (uint32_t)atol(c + 1) : 0; } }
+            if (at >= 0 && frame_no == (uint32_t)at && to) ips = to;
+        }
+#endif
         win_frames++;
         if (now - sec_t0 >= 500) {                     /* every half second: load and speed */
             load_pct = emu_ms * 100u / (now - sec_t0);
