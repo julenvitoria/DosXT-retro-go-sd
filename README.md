@@ -165,7 +165,7 @@ Teclado en pantalla (4 filas: dos en la franja de arriba y dos en la de abajo, e
 
 - **A:** menú de discos (se abre encima de la imagen): lista los `.img` de la carpeta de la imagen arrancada y mete el elegido en A:
   (el DOS detecta el cambio de disco).
-- **CPU**: velocidad de la CPU emulada en MHz equivalentes de un 8088: 4,77 (IBM PC/XT), 8 (por defecto, Turbo XT), 10, 12, 16 y 20 MHz (aprox. 66.000 instrucciones/s por MHz). Al pulsarla se muestra un momento arriba; la franja inferior indica los MHz y la **carga** de la consola: si pasa de ~90 %, baja la velocidad.
+- **CPU**: velocidad de la CPU emulada en MHz equivalentes de un 8088: 4,77 (IBM PC/XT), 8 (por defecto, Turbo XT), 10, 12, 16 y 20 MHz (aprox. 66.000 instrucciones/s por MHz). Al pulsarla se muestra un momento arriba; la franja inferior indica los MHz y la **carga** de la consola. La velocidad elegida es un **máximo**: si la consola no llega a emular tantas instrucciones en tiempo real (con lo que el sonido se entrecorta), el core baja la velocidad sola hasta lo que cabe y la vuelve a subir cuando hay margen; la franja lo indica como `16->11.2 MHz`.
 - **80c**: texto en 80 columnas: ventana de 40 columnas legible que sigue al cursor (por defecto)
   o la línea entera comprimida a letras de 4 píxeles.
 
