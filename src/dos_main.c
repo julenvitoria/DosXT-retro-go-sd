@@ -823,7 +823,8 @@ int dos_main(int start_paused) {
     speed_idx = (int)plat_setting_get("CpuMHz", 1);
     if (speed_idx < 0 || speed_idx >= (int)NSPEEDS) speed_idx = 1;
     ips = speeds[speed_idx].ips;
-    osd_frames = 3 * PLAT_FPS;                /* show the speed for a moment at start-up */
+    /* no speed pop-up at start-up: the bottom status line already shows it for 7 s.
+       Pressing CPU on the on-screen keyboard still pops it up, over the keys. */
     info_on = plat_setting_get("InfoBar", 0) ? 1 : 0;
     info_until = plat_ms() + INFO_MS;
     cga_zoom80 = plat_setting_get("Zoom80", 1) ? 1 : 0;
