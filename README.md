@@ -170,7 +170,9 @@ Teclado en pantalla (4 filas: dos en la franja de arriba y dos en la de abajo, e
   o la línea entera comprimida a letras de 4 píxeles.
 
 Pantalla: la imagen (320×200) va centrada; las franjas de 20 píxeles de arriba y abajo muestran el
-estado (cfg y discos arriba; MHz, carga y avisos abajo) o el teclado. Modos CGA: texto 40×25 y 80×25, gráficos 320×200 (4 colores) y 640×200
+estado (cfg y discos arriba; MHz y carga abajo) o el teclado. El estado se ve 7 segundos al arrancar
+y luego desaparece; la línea de abajo puede quedarse fija con **Info: ON** en el menú de retro-go
+(PAUSE/SET → Options). El aviso de "Falta memoria de video" se ve siempre. Modos CGA: texto 40×25 y 80×25, gráficos 320×200 (4 colores) y 640×200
 (2 colores); EGA/VGA: ver arriba.
 Sonido: altavoz del PC a 48 kHz, calculado a partir del puerto 61h y del canal 2 del PIT con la
 precisión de una instrucción y promediado en cada muestra (sin el zumbido ni las notas falsas de
