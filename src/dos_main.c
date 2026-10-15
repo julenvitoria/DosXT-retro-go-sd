@@ -319,6 +319,16 @@ static void handle_input(uint32_t b) {
 #define PIC_Y 20                          /* the PC picture: lines 20..219 */
 static uint32_t load_pct = 0;
 
+/* The status lines show for INFO_MS after start-up and then get out of the way: the top
+   band (cfg, drives) always, the bottom band (CPU, MHz, load) unless "Info" is ON in
+   retro-go's PAUSE/SET menu (platform_core.c), saved as the setting "InfoBar". A video
+   memory warning stays up regardless -- it says why the picture is wrong. */
+#define INFO_MS 7000u
+static uint32_t info_until;               /* plat_ms() when the start-up window closes */
+static int info_on = 0;
+int  dos_info_get(void) { return info_on; }
+void dos_info_set(int on) { info_on = on ? 1 : 0; plat_setting_set("InfoBar", info_on); }
+
 /* ---- speed governor ----
    The chosen speed is a CEILING. If the console cannot emulate that many instructions per
    frame in real time, frames run late, retro-go's audio buffer drains between them and the
@@ -382,6 +392,8 @@ static void draw_bands(uint8_t* fb) {
             ui_text(fb, 8, y, images[first + i], sel ? 15 : 7, sel ? 1 : 0);
         }
     } else {
+        int early = (int32_t)(info_until - plat_ms()) > 0;
+        if (early) {
         if (cfg_name[0]) {
             snprintf(line, sizeof(line), gcfg.errors ? "cfg: %.24s (%d errores)" : "cfg: %.24s", cfg_name, gcfg.errors);
             ui_text(fb, 0, 2, line, gcfg.errors ? 12 : 10, 0);
@@ -393,6 +405,7 @@ static void draw_bands(uint8_t* fb) {
         else
             snprintf(line, sizeof(line), "A:%.14s C:%.14s", drive_a[0] ? drive_a : "-", drive_c[0] ? drive_c : "-");
         ui_text(fb, 0, 11, line, 3, 0);
+        }
         if (ips < speeds[speed_idx].ips) {               /* the governor has slowed it down */
             unsigned m10 = (unsigned)((ips + 3300) / 6600);  /* ~66,000 instr/s per MHz */
             snprintf(line, sizeof(line), "8088 %s->%u.%u MHz  carga %u%%", speeds[speed_idx].mhz, m10 / 10, m10 % 10, (unsigned)load_pct);
@@ -407,7 +420,7 @@ static void draw_bands(uint8_t* fb) {
         if (vga_dbg_drop > 64)                           /* the game used more video memory than there is */
             ui_text(fb, 0, 230, vga_plane_size < 65536 ? "Falta memoria de video: vram = 256 en cfg" : "Falta memoria de video", 12, 0);
 #endif
-        ui_text(fb, 0, 221, line, 8, 0);
+        if (early || info_on) ui_text(fb, 0, 221, line, 8, 0);
     }
 }
 
@@ -811,6 +824,8 @@ int dos_main(int start_paused) {
     if (speed_idx < 0 || speed_idx >= (int)NSPEEDS) speed_idx = 1;
     ips = speeds[speed_idx].ips;
     osd_frames = 3 * PLAT_FPS;                /* show the speed for a moment at start-up */
+    info_on = plat_setting_get("InfoBar", 0) ? 1 : 0;
+    info_until = plat_ms() + INFO_MS;
     cga_zoom80 = plat_setting_get("Zoom80", 1) ? 1 : 0;
 
     for (int i = 0; ; i++) {

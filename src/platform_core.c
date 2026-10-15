@@ -78,8 +78,23 @@ bool plat_frame_begin(void) {
     return common_emu_frame_loop();
 }
 
+/* "Info ON/OFF" in retro-go's PAUSE/SET menu: keeps the bottom status line on screen */
+int  dos_info_get(void);
+void dos_info_set(int on);
+static char info_value[8];
+static bool info_cb(odroid_dialog_choice_t* option, odroid_dialog_event_t event, uint32_t repeat) {
+    (void)repeat;
+    if (event == ODROID_DIALOG_PREV || event == ODROID_DIALOG_NEXT || event == ODROID_DIALOG_ENTER)
+        dos_info_set(!dos_info_get());
+    strcpy(option->value, dos_info_get() ? "ON" : "OFF");
+    return false;                                      /* stay in the menu */
+}
+
 uint32_t plat_buttons(void) {
-    static odroid_dialog_choice_t options[] = { ODROID_DIALOG_CHOICE_LAST };
+    static odroid_dialog_choice_t options[] = {
+        { 100, "Info", info_value, 1, info_cb },      /* the CPU / MHz / load line */
+        ODROID_DIALOG_CHOICE_LAST
+    };
     odroid_gamepad_state_t js;
     odroid_input_read_gamepad(&js);
     common_emu_input_loop(&js, options, &dos_repaint);   /* PAUSE menu, power, volume... */
