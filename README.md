@@ -78,7 +78,9 @@ python3 tools/fat12.py newhd c.img --size 32          # disco vacío, formateado
 3. Cuando pida otro disco, abre el menú de discos y elige `Disk02.img` (luego `Disk03.img`).
 4. Al terminar ("retire el disquete y presione ENTRAR"): en el menú de discos elige
    **(sacar el disco de A:)** y pulsa ENTRAR; sin disquete, el PC arranca desde C:.
-5. A partir de ahí arranca `c.img` desde el menú y sale tu DOS instalado.
+5. A partir de ahí arranca `c.img` desde el menú y sale tu DOS instalado. Para que un juego
+   arranque con ese DOS, pon `boot = c.img` en su cfg: el DOS sale de C: y el juego queda en A:
+   (`run = a:;juego`). La tecla `:` está en el teclado de pantalla, junto a `;`.
 
 Probado con MS-DOS 5.0 en español (INSTALAR). Consejo: en "Ejecutar Shell al inicio" elige NO;
 el MS-DOS Shell es lento en un 8088 y en 80 columnas no cabe entero en la pantalla.
@@ -104,7 +106,9 @@ DOS arranca desde tu disquete de arranque. Ejemplos en `examples/cfg/` (`plantil
 ```ini
 ; comentarios con ; o #
 boot   = !BOOT.img     ; arranca el DOS desde esta imagen (A:); el juego queda en B: (disquete)
-                           ; o C: (disco duro). Se busca en /cores/dos y luego en /roms/dos
+                           ; o C: (disco duro). Se busca en /cores/dos y luego en /roms/dos.
+                           ; Si es un disco duro (boot = c.img, con DOS instalado) arranca desde
+                           ; C: y el juego queda en A: (disquete) o D: (disco duro): run = a:;juego
 run    = b:;prince         ; se escribe en el prompt del DOS; ";" = Intro entre órdenes
 cpu    = 10                ; MHz: 4.77, 8, 10, 12, 16, 20
 zoom80 = 0                 ; texto de 80 columnas: 1 = ventana de 40, 0 = línea entera
