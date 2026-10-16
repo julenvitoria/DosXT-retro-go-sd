@@ -280,6 +280,19 @@ b = sub(b, """	cpu->regs.byteregs[regdl] = bootdrive;
 	if (!(bootdrive & 0x80) && !biosdisk[bootdrive & 1].inserted && biosdisk[2].inserted)
 		cpu->regs.byteregs[regdl] = 0x80;
 	biosdisk_read(""")
+# count disk transfers: the speed governor (dos_main.c) leaves out the time windows with disk
+# activity -- a frame that waits for the SD card is not a frame the CPU speed lost
+b = sub(b, "uint8_t bootdrive = 0xFF;", "uint8_t bootdrive = 0xFF;\nvolatile uint32_t biosdisk_ops;")
+b = sub(b, """	fseek(biosdisk[drivenum].diskfile, fileoffset, SEEK_SET);
+	memdest = ((uint32_t)dstseg << 4) + (uint32_t)dstoff;
+	for (cursect = 0; cursect < sectcount; cursect++) {
+		if (fread(""", """	fseek(biosdisk[drivenum].diskfile, fileoffset, SEEK_SET);
+	biosdisk_ops++;
+	memdest = ((uint32_t)dstseg << 4) + (uint32_t)dstoff;
+	for (cursect = 0; cursect < sectcount; cursect++) {
+		if (fread(""")
+b = sub(b, """	fseek(biosdisk[drivenum].diskfile, 0L, SEEK_CUR);""", """	fseek(biosdisk[drivenum].diskfile, 0L, SEEK_CUR);
+	biosdisk_ops++;""")
 wr("modules/disk/biosdisk.c", b)
 
 # cpu.c: int_callback assignment has a mismatched pointer type (error on GCC >= 14)
