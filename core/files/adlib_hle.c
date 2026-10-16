@@ -18,9 +18,9 @@
   Percussion mode (register BDh bit 5) is not synthesised (EMU8950_NO_PERCUSSION_MODE, the
   Doom port's build); adlib_hle_rhythm counts the games that ask for it.
 
-  Register writes take effect at once; the chip is rendered once per frame
-  (adlib_hle_render_mix) and mixed into the frame's audio. Nothing is rendered while every
-  operator is silent, so a game without AdLib music costs nothing.
+  The chip is rendered up to each register write as it happens (see "Rendering" below) and
+  the frame is mixed into the audio at its end. Nothing is synthesised while every operator
+  is silent, so a game without AdLib music costs nothing.
 */
 #include <stdint.h>
 #include <string.h>
@@ -81,6 +81,8 @@ static void opl_reset_chip(void) {
 	t_ctrl = t_flags = 0;
 }
 
+static void render_to_now(void);
+
 static void opl_write_reg(uint8_t reg, uint8_t val) {
 	adlib_hle_writes++;
 	switch (reg) {
@@ -96,6 +98,7 @@ static void opl_write_reg(uint8_t reg, uint8_t val) {
 		return;
 	}
 	if (!opl) return;
+	render_to_now();          /* the chip plays its old state up to this instruction */
 	if (reg == 0xBD) {
 		uint8_t want = (val >> 5) & 1;
 		if (want && !rhythm_on) adlib_hle_rhythm++;
@@ -148,11 +151,30 @@ static int opl_active(void) {
 	return 0;
 }
 
-/* render n samples at `rate` Hz and add them into dst (clamped) */
-void adlib_hle_render_mix(int16_t* dst, unsigned n, unsigned rate) {
-	if (!opl || !opl_active()) { s0 = s1 = 0; return; }
-	uint32_t step = (uint32_t)(((uint64_t)OPL_CLOCK_HZ << 16) / rate);
-	for (unsigned i = 0; i < n; i++) {
+/*
+  Rendering is INCREMENTAL, like the speaker's: before every register write the chip is
+  rendered up to the instruction the write happens at, so a note starts where the game
+  started it and not at the next frame boundary. Rendering once per frame instead batched
+  a music driver's ~70-140 Hz ticks onto the 60 Hz frame -- notes and volume steps landed
+  up to 16 ms late and unevenly, which showed as a 60 Hz ripple on the music's envelope.
+  The frame's samples go to opl_buf and are mixed in at the end of the frame.
+*/
+#define FRAME_MAX 1024
+static int16_t opl_buf[FRAME_MAX];
+static unsigned f_n, f_done, f_rate;       /* output samples in this frame, rendered so far */
+static uint32_t f_len;                     /* instructions in this frame */
+static uint32_t blk_done, blk_len;        /* the block of instructions being run */
+static uint64_t blk_exec0;
+
+static void render_samples(unsigned upto) {
+	if (upto > f_n) upto = f_n;
+	if (upto <= f_done) return;
+	if (!opl || !opl_active()) {
+		memset(opl_buf + f_done, 0, (upto - f_done) * sizeof(int16_t));
+		s0 = s1 = 0; f_done = upto; return;
+	}
+	uint32_t step = (uint32_t)(((uint64_t)OPL_CLOCK_HZ << 16) / f_rate);
+	for (unsigned i = f_done; i < upto; i++) {
 		frac += step;
 		while (frac >= 0x10000u) {
 			frac -= 0x10000u;
@@ -166,8 +188,37 @@ void adlib_hle_render_mix(int16_t* dst, unsigned n, unsigned rate) {
 			s1 = (int16_t)s;
 		}
 		int32_t v = s0 + (((int32_t)(s1 - s0) * (int32_t)(frac >> 8)) >> 8);   /* linear, not a hold */
-		v *= 2;                                         /* the Doom port's music gain */
-		int32_t o = (int32_t)dst[i] + v;
+		v = v * 3 / 2;                                  /* music gain, with headroom left */
+		if (v > 32767) v = 32767; else if (v < -32768) v = -32768;
+		opl_buf[i] = (int16_t)v;
+	}
+	f_done = upto;
+}
+
+static void render_to_now(void) {
+	if (!f_n || !f_len) return;
+	uint64_t d = exec_ctr ? *exec_ctr - blk_exec0 : 0;
+	if (d > blk_len) d = blk_len;                  /* HLT does not count instructions */
+	uint64_t pos = (uint64_t)blk_done + d;
+	render_samples((unsigned)(pos * f_n / f_len));
+}
+
+void adlib_hle_frame_begin(unsigned n, unsigned rate, uint32_t frame_instr) {
+	f_n = n > FRAME_MAX ? FRAME_MAX : n; f_rate = rate; f_len = frame_instr; f_done = 0;
+	blk_done = blk_len = 0;
+	blk_exec0 = exec_ctr ? *exec_ctr : 0;
+}
+
+void adlib_hle_chunk(uint32_t done, uint32_t len) {
+	blk_done = done; blk_len = len;
+	blk_exec0 = exec_ctr ? *exec_ctr : 0;
+}
+
+/* finish the frame and add it into dst (clamped) */
+void adlib_hle_frame_end_mix(int16_t* dst) {
+	render_samples(f_n);
+	for (unsigned i = 0; i < f_n; i++) {
+		int32_t o = (int32_t)dst[i] + opl_buf[i];
 		if (o > 32767) o = 32767; else if (o < -32768) o = -32768;
 		dst[i] = (int16_t)o;
 	}

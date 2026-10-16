@@ -142,7 +142,21 @@ void plat_audio(const int16_t* s, int n) {
     int len = audio_get_buffer_length();
     if (n > len) n = len;
     int32_t vol = common_emu_sound_get_volume();
-    for (int i = 0; i < n; i++) out[i] = (int16_t)((s[i] * vol) >> 8);
+    /* THE CONSOLE'S SPEAKER CANNOT PLAY BASS. A recording of AdLib music on the console had
+       1 % of its energy below 300 Hz where the same music rendered here has 66 %: the bass
+       line only drives the little speaker towards distortion and eats the headroom the
+       melody needs. A 2nd-order high-pass at 200 Hz (Butterworth) takes it out before the
+       volume, so what the speaker can play comes out cleaner. */
+    static float x1, x2, y1, y2;
+    const float b0 = 0.98166f, b1 = -1.96332f, b2 = 0.98166f, a1 = -1.96298f, a2 = 0.96365f;  /* fc 200 Hz @ 48 kHz */
+    for (int i = 0; i < n; i++) {
+        float x0 = (float)s[i];
+        float y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+        x2 = x1; x1 = x0; y2 = y1; y1 = y0;
+        int32_t v = (int32_t)y0;
+        if (v > 32767) v = 32767; else if (v < -32768) v = -32768;
+        out[i] = (int16_t)((v * vol) >> 8);
+    }
 }
 
 void plat_frame_end(void) { common_emu_sound_sync(false); }

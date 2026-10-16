@@ -444,7 +444,9 @@ void spk_hle_frame_end(void);
 #endif
 #ifdef XT_ADLIB_HLE
 void adlib_hle_init(const uint64_t* exec, const uint32_t* ips);
-void adlib_hle_render_mix(int16_t* dst, unsigned n, unsigned rate);
+void adlib_hle_frame_begin(unsigned n, unsigned rate, uint32_t frame_instr);
+void adlib_hle_chunk(uint32_t done, uint32_t len);
+void adlib_hle_frame_end_mix(int16_t* dst);
 #endif
 #ifdef XT_SB_HLE
 void sb_hle_init(I8237_t* d, I8259_t* p, const uint64_t* exec, const uint32_t* ips);
@@ -468,6 +470,9 @@ static void run_frame(void) {
     /* the speaker is rendered from the guest's port writes, timed to the instruction */
     spk_hle_frame_begin(&machine.CPU.totalexec, target, ips, audio, PLAT_AUDIO_SAMPLES);
 #endif
+#ifdef XT_ADLIB_HLE
+    adlib_hle_frame_begin(PLAT_AUDIO_SAMPLES, PLAT_AUDIO_RATE, target);
+#endif
     for (uint32_t done = 0; done < target; done += instructionsperloop) {
         const uint32_t chunk = target - done < instructionsperloop ? target - done : instructionsperloop;
         cpu_interruptCheck(&machine.CPU, &machine.i8259);
@@ -476,6 +481,9 @@ static void run_frame(void) {
 #endif
 #ifdef XT_SB_HLE
         sb_hle_chunk(done);
+#endif
+#ifdef XT_ADLIB_HLE
+        adlib_hle_chunk(done, chunk);
 #endif
         cpu_exec(&machine.CPU, chunk);
 #ifdef XT_SB_HLE
@@ -498,7 +506,7 @@ static void run_frame(void) {
     spk_hle_frame_end();
     (void)si;
 #ifdef XT_ADLIB_HLE
-    adlib_hle_render_mix(audio, PLAT_AUDIO_SAMPLES, PLAT_AUDIO_RATE);   /* AdLib music on top */
+    adlib_hle_frame_end_mix(audio);                                     /* AdLib music on top */
 #endif
 #ifdef XT_SB_HLE
     sb_hle_render_mix(audio, PLAT_AUDIO_SAMPLES, target);               /* and digitised sound */
