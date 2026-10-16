@@ -158,6 +158,18 @@ void spk_hle_chunk(uint32_t done, uint32_t len) {
 }
 
 void spk_hle_frame_end(void) {
+	/* SILENT FAST PATH: with the speaker data bit off the level is 0 whatever the PIT does,
+	   and once the DC and low-pass filters have settled every sample is 0. Monkey Island
+	   (AdLib music) spent ~18 % of a host profile here averaging and filtering 800 zeros a
+	   frame in double precision. */
+	if (!data_bit && pos == 0 && dc > -0.5 && dc < 0.5 && lp > -0.5 && lp < 0.5) {
+		for (int i = 0; i < nout; i++) out[i] = 0;
+		dc = lp = 0; acc = 0;
+		if (pend && pend_t <= frame_abs + frame_len) apply_pending();
+		frame_abs += (uint64_t)frame_len;
+		out = 0;
+		return;
+	}
 	advance_to(frame_len);
 	while (iout < nout) emit(acc ? acc / (frame_len / nout) : 0);
 	frame_abs += (uint64_t)frame_len;

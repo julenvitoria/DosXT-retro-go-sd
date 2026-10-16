@@ -346,6 +346,22 @@ static void handle_input(uint32_t b) {
     prev_buttons = b;
 }
 
+#ifdef GWDOS_PROF
+/* Profiling builds (EXTRA_DEFS=-DGWDOS_PROF): where each frame's cycles go, shown on the
+   bottom line -- cpu = the 8088 interpreter (port I/O, video memory writes and the AdLib
+   synthesis triggered by register writes included), opl = the AdLib synthesis on its own,
+   snd = speaker / mixing / hand-off, vid = drawing the LCD, esp = waiting for the audio DMA;
+   c/i = console cycles per emulated instruction. */
+enum { P_CPU, P_SND, P_VID, P_WAIT, P_N };
+static uint32_t prof_acc[P_N], prof_pct[P_N + 1], prof_cpi;
+extern uint32_t adlib_prof_cyc;
+#define PROF_T0() uint32_t prof_t0 = plat_cycles()
+#define PROF_ADD(k) do { uint32_t t_ = plat_cycles(); prof_acc[k] += t_ - prof_t0; prof_t0 = t_; } while (0)
+#else
+#define PROF_T0() do { } while (0)
+#define PROF_ADD(k) do { } while (0)
+#endif
+
 /* ---- the bands above and below the picture ---- */
 #define PIC_Y 20                          /* the PC picture: lines 20..219 */
 static uint32_t load_pct = 0;
@@ -474,6 +490,11 @@ static void draw_bands(uint8_t* fb) {
             ui_text(fb, 0, 230, vga_plane_size < 65536 ? "Falta memoria de video: vram = 256 en cfg" : "Falta memoria de video", 12, 0);
 #endif
         if (early || info_on) ui_text(fb, 0, 221, line, 8, 0);
+#ifdef GWDOS_PROF
+        snprintf(line, sizeof(line), "cpu%u opl%u snd%u vid%u esp%u %uc/i", (unsigned)prof_pct[P_CPU], (unsigned)prof_pct[P_N],
+                 (unsigned)prof_pct[P_SND], (unsigned)prof_pct[P_VID], (unsigned)prof_pct[P_WAIT], (unsigned)prof_cpi);
+        ui_text(fb, 0, 230, line, 14, 0);
+#endif
         if (boot_missing[0]) {                           /* stays up: it is why nothing boots */
             snprintf(line, sizeof(line), "No encuentro %.26s", boot_missing);
             ui_fill(fb, 0, 0, 320, PIC_Y, 0);
@@ -544,7 +565,11 @@ static void run_frame(void) {
 #ifdef XT_ADLIB_HLE
         adlib_hle_chunk(done, chunk);
 #endif
-        cpu_exec(&machine.CPU, chunk);
+        {
+            PROF_T0();
+            cpu_exec(&machine.CPU, chunk);
+            PROF_ADD(P_CPU);
+        }
 #ifdef XT_SB_HLE
         sb_hle_tick(done, chunk);              /* DMA samples due in this block, IRQ 7 */
 #endif
@@ -561,6 +586,7 @@ static void run_frame(void) {
 #endif
         key_pump(chunk);
     }
+    PROF_T0();
 #ifdef XT_SPK_HLE
     spk_hle_frame_end();
     (void)si;
@@ -575,6 +601,7 @@ static void run_frame(void) {
     while (si < PLAT_AUDIO_SAMPLES) audio[si++] = last;
 #endif
     cga_doDraw = 0;
+    PROF_ADD(P_SND);
 }
 
 /* ---- "run =": type commands at the DOS prompt through the BIOS keyboard buffer ----
@@ -1099,7 +1126,13 @@ int dos_main(int start_paused) {
     uint32_t win_miss = 0, win_c0 = plat_cycles(), cyc_per_ms = 0;   /* 0 until calibrated: no misses counted */
     for (;;) {
         uint32_t tw = plat_ms();
+#ifdef GWDOS_PROF
+        uint32_t tb = plat_cycles();
         bool draw = plat_frame_begin();
+        prof_acc[P_WAIT] += plat_cycles() - tb;
+#else
+        bool draw = plat_frame_begin();
+#endif
         wait_ms += plat_ms() - tw;
         /* the LCD switches to 8-bit mode at a vsync and the CLUT is ignored until then:
            program the palette again during the first frames */
@@ -1146,19 +1179,34 @@ int dos_main(int start_paused) {
             }
 #endif
             {   uint32_t c = plat_cycles();                  /* recalibrate cycles per ms */
+#ifdef GWDOS_PROF
+                {   static uint64_t ex0; uint32_t tot = c - win_c0;
+                    uint64_t ex = machine.CPU.totalexec;
+                    if (tot) {
+                        for (int k = 0; k < P_N; k++) prof_pct[k] = (uint32_t)((uint64_t)prof_acc[k] * 100u / tot);
+                        prof_pct[P_N] = (uint32_t)((uint64_t)adlib_prof_cyc * 100u / tot);
+                    }
+                    prof_cpi = ex > ex0 ? (uint32_t)(prof_acc[P_CPU] / (ex - ex0)) : 0;
+                    ex0 = ex; adlib_prof_cyc = 0;
+                    for (int k = 0; k < P_N; k++) prof_acc[k] = 0; }
+#endif
                 if (win) cyc_per_ms = (c - win_c0) / win;
                 win_c0 = c; }
             emu_ms = 0; win_frames = 0; win_late = 0; win_miss = 0; wait_ms = 0; sec_t0 = now;
         }
+        PROF_T0();
         if (draw) {
             draw_screen(plat_framebuffer());
             plat_present();
         }
+        PROF_ADD(P_VID);
         plat_audio(audio, PLAT_AUDIO_SAMPLES);
+        PROF_ADD(P_SND);
         tw = plat_ms();
         uint32_t tc = plat_cycles();
         plat_frame_end();                              /* waits for the audio DMA: idle time */
         if (plat_cycles() - tc < cyc_per_ms / 20) win_miss++;   /* under 50 us: no wait, late */
+        PROF_ADD(P_WAIT);
         wait_ms += plat_ms() - tw;
     }
     return 0;
