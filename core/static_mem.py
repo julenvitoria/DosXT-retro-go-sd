@@ -347,4 +347,6 @@ shutil.copy(os.path.join(here, "files", "adlib_hle.c"), os.path.join(d, "adlib_h
 os.makedirs(os.path.join(d, "emu8950"), exist_ok=True)
 for f in ("emu8950.c", "emu8950.h", "slot_render.h"):
     shutil.copy(os.path.join(here, "files", "emu8950", f), os.path.join(d, "emu8950", f))
+# XT_SB_HLE: Sound Blaster 2.0 DSP at 220h, IRQ 7, DMA 1 (sb_hle.c)
+shutil.copy(os.path.join(here, "files", "sb_hle.c"), os.path.join(d, "sb_hle.c"))
 print("phase 3 static-memory patches applied")

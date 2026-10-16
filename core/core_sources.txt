@@ -2,3 +2,4 @@ machine.c memory.c ports.c timing.c xt_pool.c debuglog.c utility.c cpu/cpu.c chi
 spk_hle.c
 adlib_hle.c
 emu8950/emu8950.c
+sb_hle.c

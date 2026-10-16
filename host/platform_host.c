@@ -54,7 +54,7 @@ static void dump_text(void) {   /* 80x25 text page, printable ASCII only */
 int dos_main(int start_paused);
 void dos_debug_state(char* buf, size_t n);
 
-static uint8_t region0[551 * 1024], region1[150 * 1024];   /* as on the console with the current core size */
+static uint8_t region0[514 * 1024], region1[150 * 1024], region2[88 * 1024];   /* about as on the console: RAM_EMU after the core, LCD spare, DTCM+ITCM */
 static uint8_t fb[PLAT_LCD_W * PLAT_LCD_H];
 static uint32_t pal[256];
 static long frame = 0, frames_total = 0;
@@ -67,6 +67,7 @@ static long audio_samples = 0;
 size_t plat_mem_region(int index, uint8_t** base) {
     if (index == 0) { *base = region0; return sizeof(region0); }
     if (index == 1) { *base = region1; return sizeof(region1); }
+    if (index == 2) { *base = region2; return sizeof(region2); }
     return 0;
 }
 void plat_init(bool start_paused) { (void)start_paused; }
