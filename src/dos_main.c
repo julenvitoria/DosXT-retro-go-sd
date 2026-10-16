@@ -282,14 +282,17 @@ static uint32_t nav_repeat(uint32_t b, uint32_t pressed) {
 }
 
 static int run_state;                     /* "run =" autotyping (below): non-zero while it works */
+static int dos_prompt_visible(void);
 
 static void handle_input(uint32_t b) {
     uint32_t pressed = b & ~prev_buttons;
     /* While "run =" is still typing its commands, a button press would land in the middle
        of them: Esc cancels the DOS line (DOS prints "\" and drops to a new line with no
        prompt), the autotyper never sees a prompt again and the game never starts until
-       Enter is pressed by hand. So the pad (not the on-screen keyboard's door) waits. */
-    if (ui_mode == 0 && run_state) {
+       Enter is pressed by hand. So the pad (not the on-screen keyboard's door) waits --
+       from the moment a DOS prompt is on screen. Before that it still works, so Esc can
+       skip the BIOS memory test. */
+    if (ui_mode == 0 && run_state && (run_state != 1 || dos_prompt_visible())) {
         uint32_t door = 0;
         for (int i = 0; i < GC_BUTTONS; i++)
             if (padkeys[i][0] == GC_KEY_KEYBOARD) door |= 1u << i;
@@ -351,24 +354,26 @@ void dos_info_set(int on) { info_on = on ? 1 : 0; plat_setting_set("InfoBar", in
    PIT -- music tempo and note pitch -- stays right; only CPU-bound game logic runs slower,
    exactly as if a slower speed had been picked by hand. */
 #define IPS_MIN 300000u
-static void speed_governor(uint32_t frames, uint32_t ms, uint32_t load, uint32_t late) {
+static void speed_governor(uint32_t frames, uint32_t ms, uint32_t busy, uint32_t late) {
+    static uint8_t hold;                   /* half seconds before it may speed up again */
     uint32_t ceiling = speeds[speed_idx].ips;
     if (!ms || ms > 1500) return;      /* a long stall is retro-go's menu or a disk load, not speed */
     uint32_t fps10 = frames * 10000u / ms;                 /* frames/s x 10 */
-    /* Two signals. Frames lost (< 57.5/s) is the obvious one, but throttled by that alone
-       (16->11.2 MHz) Monkey Island still sounded wrong on the console: fitting the AVERAGE
-       frame leaves no room for the frames that cost more, and then the render and the audio
-       hand-off land late. So the emulation's own share of the time is held at ~70 % too. */
+    /* `busy` is the WHOLE frame -- emulation, drawing, AdLib, audio hand-off -- i.e. the time
+       NOT spent waiting for the audio DMA. The first version held only the emulation's
+       share, and on the console Monkey Island with AdLib still clicked at 9-10 MHz with
+       that share at ~60 %: the rest of the frame took the other 40 %, frames came in late
+       and the DMA replayed the previous 16.7 ms block (the click; see below). At a fixed
+       8 MHz, 54 %, it was clean.
+       Late frames also put the speed on HOLD for 10 s: creeping back up every clean half
+       second walked straight into the limit again, so the clicks came back periodically
+       (seen as 16->9.0 / 10.1 / 9.6 / 10.4 MHz in the same video). */
     uint64_t n = ips;
-    if (fps10 < 575) n = n * fps10 / 600u;
-    /* Third signal: frames that came in LATE. On the console a late frame does not drop
-       sound, it REPEATS it -- the audio DMA plays the previous 16.7 ms block again -- and
-       that is the click heard in Monkey Island with AdLib music at 11 MHz / ~70 %: in a
-       recording, the audio around each click correlates with itself one frame earlier
-       (0.69, against 0.31 elsewhere). Two or more late frames in the half second cost 7 %. */
-    if (load > 80) n = n * 70u / load;
-    else if (late >= 2) n = n * 93u / 100u;
-    else if (fps10 >= 575 && load < 55 && !late && ips < ceiling) n = n + n / 10;   /* headroom */
+    if (fps10 < 575) { n = n * fps10 / 600u * 95u / 100u; hold = 20; }   /* frames lost */
+    else if (busy > 90) { n = n * 82u / busy; hold = 20; }                 /* no slack left */
+    else if (late) { n = n * 95u / 100u; hold = 20; }                      /* the odd heavy frame */
+    else if (hold) hold--;
+    else if (busy < 75 && ips < ceiling) n = n + n / 25;                   /* +4 % */
     ips = n < IPS_MIN ? IPS_MIN : (uint32_t)n;
     if (ips > ceiling) ips = ceiling;
 }
@@ -574,9 +579,31 @@ static int bios_kbd_put(uint16_t key) {
     return 1;
 }
 
+/* DOS's answer to Esc at the prompt: "\" at the end of the prompt line and the cursor on
+   an empty new line, with no prompt -- the autotyper would wait for one for ever. */
+static int dos_line_cancelled(void) {
+    if (bda8(0x49) > 3) return 0;
+    int cols = bda16(0x4A); if (cols != 40 && cols != 80) return 0;
+    uint16_t cur = bda16(0x50);
+    int col = cur & 0xFF, row = cur >> 8;
+    if (row < 1 || row > 24 || col >= cols) return 0;
+    uint32_t line = 0xB8000 + (uint32_t)row * cols * 2, prev = line - (uint32_t)cols * 2;
+    for (int c = 0; c < col; c++) if (cpu_read(&machine.CPU, line + c * 2) != ' ') return 0;
+    int last = cols - 1;
+    while (last > 0 && cpu_read(&machine.CPU, prev + last * 2) == ' ') last--;
+    uint8_t p0 = cpu_read(&machine.CPU, prev), p1 = cpu_read(&machine.CPU, prev + 2);
+    return cpu_read(&machine.CPU, prev + last * 2) == '\\' && (p1 == ':' || p0 == ' ' || p0 == '\\');
+}
+
 static void autorun_frame(void) {
     if (!run_state) return;
     int prompt = dos_prompt_visible();
+    if ((run_state == 1 || run_state == 3) && !prompt && dos_line_cancelled()) {
+        /* a key that was waiting in the BIOS buffer from before the prompt (the pad is only
+           held back once a prompt is on screen) cancelled the line: ask for a new prompt */
+        if (++prompt_frames >= 20) { bios_kbd_put(0x1C0D); prompt_frames = 0; }
+        return;
+    }
     if (run_state == 1 || run_state == 3) {
         uint16_t cur = bda16(0x50);
         if (prompt && (run_state == 1 || cur != run_cursor)) prompt_frames++;
@@ -913,9 +940,11 @@ int dos_main(int start_paused) {
 
     if (ok) insert_boot_disks();
 
-    uint32_t sec_t0 = plat_ms(), emu_ms = 0, frame_no = 0, win_frames = 0, win_late = 0, last_ms = plat_ms();
+    uint32_t sec_t0 = plat_ms(), emu_ms = 0, frame_no = 0, win_frames = 0, win_late = 0, last_ms = plat_ms(), wait_ms = 0;
     for (;;) {
+        uint32_t tw = plat_ms();
         bool draw = plat_frame_begin();
+        wait_ms += plat_ms() - tw;
         /* the LCD switches to 8-bit mode at a vsync and the CLUT is ignored until then:
            program the palette again during the first frames */
         ++frame_no;
@@ -943,16 +972,22 @@ int dos_main(int start_paused) {
         if (now - last_ms >= 20 && now - last_ms < 200) win_late++;   /* a frame is 16.7 ms */
         last_ms = now;
         if (now - sec_t0 >= 500) {                     /* every half second: load and speed */
-            load_pct = emu_ms * 100u / (now - sec_t0);
-            if (ok) speed_governor(win_frames, now - sec_t0, load_pct, win_late);
-            emu_ms = 0; win_frames = 0; win_late = 0; sec_t0 = now;
+            /* "carga" = the share of the time the console was busy, not waiting for audio */
+            uint32_t win = now - sec_t0;
+            load_pct = wait_ms >= win ? 0 : 100u - wait_ms * 100u / win;
+#ifndef GWDOS_HOST                                    /* the harness is not real time */
+            if (ok) speed_governor(win_frames, win, load_pct, win_late);
+#endif
+            emu_ms = 0; win_frames = 0; win_late = 0; wait_ms = 0; sec_t0 = now;
         }
         if (draw) {
             draw_screen(plat_framebuffer());
             plat_present();
         }
         plat_audio(audio, PLAT_AUDIO_SAMPLES);
-        plat_frame_end();
+        tw = plat_ms();
+        plat_frame_end();                              /* waits for the audio DMA: idle time */
+        wait_ms += plat_ms() - tw;
     }
     return 0;
 }
