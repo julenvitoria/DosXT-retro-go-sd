@@ -335,6 +335,42 @@ p = sub(p, "#ifdef XT_VGA_HLE\n\tif (intnum == 0x10 && vga_hle_int10(cpu)) retur
            "#ifdef XT_VGA_HLE\n\tif (intnum == 0x10 && vga_hle_int10(cpu)) return;\n#endif\n#ifdef XT_MOUSE_HLE\n\tif (intnum == 0x33 && mouse_hle_int33(cpu)) return;\n#endif")
 p = sub(p, "#ifdef XT_VGA_HLE\nint vga_hle_int10(CPU_t* cpu);\n#endif", "#ifdef XT_VGA_HLE\nint vga_hle_int10(CPU_t* cpu);\n#endif\n#ifdef XT_MOUSE_HLE\nint mouse_hle_int33(CPU_t* cpu);\n#endif")
 wr("cpu/cpu.c", p)
+# MEMORY FAST PATH + LESS CODE. cpu_read()/cpu_write() live in memory.c, so every guest
+# memory access was an out-of-line call (the most called function in a host profile: 220 M
+# calls for 150 s of Monkey Island). In cpu.c they become inline page-table lookups; only
+# pages with no direct mapping (EGA/VGA planes, handlers) take the call. And the operand
+# helpers (readrm/writerm, push/pop) stop being force-inlined into every opcode: one copy
+# each, with the fast lookup inside. Inlined everywhere the core grew 26 KB -- two 16 KB
+# chunks of DOS memory (624 -> 592 KB); this way cpu.o is 64 KB instead of 75.
+p = rd("cpu/cpu.c")
+p = sub(p, 'I8259_t* cpu_pic = NULL;', '''#include "../memory.h"
+static inline uint8_t cpu_read_fast(CPU_t* cpu, uint32_t a) {
+	const uint8_t* pg;
+	a &= MEMORY_MASK;
+	pg = memory_pageRead[a >> MEMORY_PAGE_SHIFT];
+	if (__builtin_expect(pg != NULL, 1)) return pg[a & MEMORY_PAGE_MASK];
+	return cpu_read(cpu, a);
+}
+static inline void cpu_write_fast(CPU_t* cpu, uint32_t a, uint8_t v) {
+	uint8_t* pg;
+	a &= MEMORY_MASK;
+	pg = memory_pageWrite[a >> MEMORY_PAGE_SHIFT];
+	if (__builtin_expect(pg != NULL, 1)) { pg[a & MEMORY_PAGE_MASK] = v; return; }
+	cpu_write(cpu, a, v);
+}
+static inline uint16_t cpu_readw_fast(CPU_t* cpu, uint32_t a) { return (uint16_t)cpu_read_fast(cpu, a) | ((uint16_t)cpu_read_fast(cpu, a + 1) << 8); }
+#define cpu_read cpu_read_fast
+#define cpu_write cpu_write_fast
+#undef getmem8
+#undef getmem16
+#define getmem8(mycpu, x, y)	cpu_read_fast(mycpu, segbase(x) + y)
+#define getmem16(mycpu, x, y)	cpu_readw_fast(mycpu, segbase(x) + y)
+
+I8259_t* cpu_pic = NULL;''')
+for f, t in (("readrm16", "uint16_t"), ("readrm8", "uint8_t"), ("writerm16", "void"), ("writerm8", "void"),
+             ("push", "void"), ("pop", "uint16_t")):
+    p = sub(p, "FUNC_INLINE %s %s(" % (t, f), "__attribute__((noinline)) static %s %s(" % (t, f))
+wr("cpu/cpu.c", p)
 shutil.copy(os.path.join(here, "files", "mouse_hle.c"), os.path.join(d, "mouse_hle.c"))
 for f in ("vga_hle.c", "vga_hle.h"):
     shutil.copy(os.path.join(here, "files", f), os.path.join(d, f))

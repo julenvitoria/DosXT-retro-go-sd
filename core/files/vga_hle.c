@@ -22,6 +22,11 @@ static uint8_t seq[5], seqi, gc[9], gci, attr[0x15], attri, attrff, misc = 0x63;
 static uint8_t dac[256][3], dac_wi, dac_ri, dac_comp, dac_state, dac_mask = 0xFF;
 static uint32_t latch;
 uint32_t vga_dbg_drop, vga_dbg_max;   /* accesses beyond video memory (debug) */
+/* Anything that can change the picture bumps vga_hle_gen (vga_hle_frame_key): the frontend
+   skips redrawing a picture that has not changed. With chain-4 mapped directly the writes
+   bypass us, so that mode always redraws. */
+static uint32_t vga_hle_gen;
+static uint8_t vga_hle_direct;
 
 /* lane p of the result = 0xFF if bit p of n is set */
 static const uint32_t nib2lanes[16] = {
@@ -47,13 +52,15 @@ static int mem_window_ok(void) { return ((gc[6] >> 2) & 3) < 2; }   /* A0000 128
 static void update_mapping(void) {
 	/* chain-4 with all planes enabled is linear memory: map it directly (fast path) */
 	if (vga_active && (seq[4] & 0x08) && (seq[2] & 0x0F) == 0x0F && mem_window_ok() && vga_plane_size * 4 >= 0x10000)
-		memory_mapRegister(0xA0000, 0x10000, vram, vram);
+		{ memory_mapRegister(0xA0000, 0x10000, vram, vram); vga_hle_direct = 1; }
 	else
-		memory_mapRegister(0xA0000, 0x10000, NULL, NULL);
+		{ memory_mapRegister(0xA0000, 0x10000, NULL, NULL); vga_hle_direct = 0; }
+	vga_hle_gen++;
 }
 
 static void vga_writemem(void* u, uint32_t addr, uint8_t val) {
 	(void)u;
+	vga_hle_gen++;
 	if (!mem_window_ok()) return;
 	uint32_t o = addr - 0xA0000;
 	if (seq[4] & 0x08) {                               /* chain-4: plane = A0..A1 */
@@ -120,6 +127,7 @@ void vga_hle_status_read(void) { attrff = 0; }
 
 static void vga_writeport(void* u, uint32_t port, uint8_t v) {
 	(void)u;
+	vga_hle_gen++;
 	switch (port) {
 	case 0x3C0:
 		if (!attrff) attri = v & 0x3F;
@@ -165,6 +173,16 @@ static uint8_t vga_readport(void* u, uint32_t port) {
 	case 0x3CF: return gci < 9 ? gc[gci] : 0xFF;
 	}
 	return 0xFF;
+}
+
+/* 0 = must redraw every frame; otherwise equal keys mean an identical picture */
+uint32_t vga_hle_frame_key(void) {
+	if (vga_hle_direct || !vram) return 0;
+	const uint8_t* c = cga_datareg;
+	uint32_t k = vga_hle_gen * 2654435761u;
+	k ^= ((uint32_t)c[0x0C] << 24) | ((uint32_t)c[0x0D] << 16) | ((uint32_t)c[0x12] << 8) | c[0x13];
+	k ^= (((uint32_t)c[0x07] << 8) | c[0x09]) * 40503u;
+	return k ? k : 1;
 }
 
 int vga_hle_init(uint32_t plane_size) {
@@ -507,6 +525,7 @@ static int palette_services(CPU_t* cpu) {
 }
 
 int vga_hle_int10(CPU_t* cpu) {
+	vga_hle_gen++;
 	if (!vram) return 0;
 	switch (AH) {
 	case 0x00:

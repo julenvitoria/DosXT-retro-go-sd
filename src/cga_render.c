@@ -109,6 +109,23 @@ static void render_gfx_hi(uint8_t* fb, int y0) {
     }
 }
 
+/* 0 = must redraw; otherwise equal keys mean an identical picture. The 16 KB of CGA memory
+   are mapped straight into the guest (no write hook), so they are hashed: ~4 K word reads,
+   far cheaper than drawing 64,000 pixels. */
+uint32_t cga_frame_key(int extra) {
+    const uint32_t* w = (const uint32_t*)cga_RAM;
+    uint32_t h = 2166136261u;
+    for (int i = 0; i < 16384 / 4; i += 4) {
+        h = (h ^ w[i]) * 16777619u; h = (h ^ w[i + 1]) * 16777619u;
+        h = (h ^ w[i + 2]) * 16777619u; h = (h ^ w[i + 3]) * 16777619u;
+    }
+    for (int i = 0; i < 16; i++) h = (h ^ cga_regs[i]) * 16777619u;
+    for (int i = 0; i < 0x14; i++) h = (h ^ cga_datareg[i]) * 16777619u;
+    h = (h ^ cga_cursor_blink_state) * 16777619u;
+    h = (h ^ (uint32_t)extra) * 16777619u;
+    return h ? h : 1;
+}
+
 void cga_render(uint8_t* fb, int y0) {
     if (!squeeze_ready) init_squeeze();
     const uint8_t mode = cga_regs[0x8];
