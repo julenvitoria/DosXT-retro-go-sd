@@ -366,6 +366,11 @@ c = sub(c, "\t\tif (loaded) switch (i8253->mode[portnum]) {",
            "#ifdef XT_SPK_HLE\n\t\tif (loaded && portnum == 2) { void spk_hle_pit2(uint8_t m, int32_t reload); spk_hle_pit2(i8253->mode[2], i8253->reload[2]); }\n#endif\n\t\tif (loaded) switch (i8253->mode[portnum]) {")
 c = sub(c, "\t\t\ti8253->bcd[sel] = value & 1;",
            "\t\t\ti8253->bcd[sel] = value & 1;\n#ifdef XT_SPK_HLE\n\t\t\tif (sel == 2) { void spk_hle_pit2_mode(uint8_t m); spk_hle_pit2_mode(i8253->mode[2]); }\n#endif")
+# The PIT ticks at 48 kHz taking 25 counts a tick: 1,200,000 counts/s against the real
+# 1,193,182 -- every timer (music tempo, the game's clock) ran 0.57 % fast. 47,727 ticks/s
+# x 25 = 1,193,175 (0.0006 % off).
+c = sub(c, "timing_addTimer(i8253_tickCallback, (void*)(&i8253->cbdata), 48000, TIMING_ENABLED);",
+           "timing_addTimer(i8253_tickCallback, (void*)(&i8253->cbdata), 47727, TIMING_ENABLED);")
 wr("chipset/i8253.c", c)
 c = rd("modules/audio/pcspeaker.c")
 c = sub(c, "\ttiming_addTimer(pcspeaker_callback, spk, SAMPLE_RATE, TIMING_ENABLED);",
