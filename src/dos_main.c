@@ -986,12 +986,42 @@ static void update_palette(int force) {
 #endif
 }
 
-static void draw_screen(uint8_t* fb) {
+/* PICTURE SKIP: drawing the PC picture cost 17 % of the console's time in EGA (7 % CGA)
+   every frame, changed or not (profiling build, Monkey Island / Alley Cat). It is redrawn
+   only when its key changes -- video memory, registers, cursor, zoom, the mouse pointer, the
+   disk menu -- and then for 2 frames, as the LCD alternates two buffers. Retro-go's HUD
+   (volume/brightness bars) and menu paint over the picture without telling us, so every
+   7th frame is drawn anyway: an odd period, so both buffers get cleaned in turn. */
+static uint32_t pic_key_prev;
+static uint8_t pic_left, pic_tick;
+uint32_t cga_frame_key(int extra);
+static int picture_needs_draw(void) {
+    uint32_t k;
 #ifdef XT_VGA_HLE
-    if (machine_ok && vga_active) vga_hle_render(fb + PIC_Y * 320, 16);
+    if (vga_active) k = vga_hle_frame_key();
     else
 #endif
-    if (machine_ok) cga_render(fb, PIC_Y);
+    k = cga_frame_key(cga_zoom80);
+#ifdef XT_MOUSE_HLE
+    {   int cx, cy;
+        if (mouse_hle_cursor(&machine.CPU, &cx, &cy)) k ^= ((uint32_t)(cx + 1) * 73856093u) ^ ((uint32_t)(cy + 1) * 19349663u);
+    }
+#endif
+    k ^= (uint32_t)ui_mode * 83492791u;
+    if (!k || k != pic_key_prev) { pic_key_prev = k; pic_left = 2; }
+    if (++pic_tick >= 7) { pic_tick = 0; if (!pic_left) pic_left = 1; }
+    if (!pic_left) return 0;
+    pic_left--;
+    return 1;
+}
+
+static void draw_screen(uint8_t* fb) {
+    int pic = !machine_ok || picture_needs_draw();
+#ifdef XT_VGA_HLE
+    if (machine_ok && vga_active) { if (pic) vga_hle_render(fb + PIC_Y * 320, 16); }
+    else
+#endif
+    if (machine_ok) { if (pic) cga_render(fb, PIC_Y); }
     else {
         ui_fill(fb, 0, PIC_Y, 320, 200, 0);
         ui_text(fb, 8, PIC_Y + 80, "gw-dos: sin memoria para el PC", 12, 0);
@@ -1068,7 +1098,7 @@ void dos_debug_state(char* buf, size_t n) {
 #endif
 
 /* used by the platform when its own menu needs the game picture redrawn */
-void dos_repaint(void) { draw_screen(plat_framebuffer()); }
+void dos_repaint(void) { pic_left = 2; draw_screen(plat_framebuffer()); }
 
 int dos_main(int start_paused) {
     plat_init(start_paused != 0);
