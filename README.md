@@ -182,7 +182,8 @@ verdad (tras medio segundo, 20 veces por segundo).
 | PAUSE/SET | Menú de retro-go (volumen, brillo, salir...) | |
 
 Teclado en pantalla (4 filas: dos en la franja de arriba y dos en la de abajo, el juego no se mueve; manteniendo la cruceta el cursor sigue avanzando): letras, números, F1–F10, flechas, Inicio/Fin, Ins/Supr, Ctrl/Alt/Shift
-(se quedan "pulsadas" hasta la siguiente tecla, para Ctrl+C, Shift+letra, etc.) y teclas especiales:
+(se quedan "pulsadas" hasta la siguiente tecla, en verde, para Ctrl+C, Shift+letra, etc.; Shift pulsado dos veces queda
+bloqueado, en rojo, como Bloq Mayús, y una tercera vez lo suelta) y teclas especiales:
 
 - **A:** menú de discos (se abre encima de la imagen): lista los `.img` de la carpeta de la imagen arrancada y mete el elegido en A:
   (el DOS detecta el cambio de disco).

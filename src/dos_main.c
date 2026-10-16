@@ -157,7 +157,13 @@ static void osk_press(uint8_t sc) {
         osd_frames = 2 * PLAT_FPS;
         return;
     }
-    uint8_t* latch = sc == 0x2A ? &latched_shift : sc == 0x1D ? &latched_ctrl : sc == 0x38 ? &latched_alt : NULL;
+    if (sc == 0x2A) {                     /* Shift: off -> next key (green) -> locked (red) -> off */
+        latched_shift = (uint8_t)((latched_shift + 1) % 3);
+        if (latched_shift == 1) key_push(0x2A);
+        else if (latched_shift == 0) key_push(0x2A | 0x80);
+        return;
+    }
+    uint8_t* latch = sc == 0x1D ? &latched_ctrl : sc == 0x38 ? &latched_alt : NULL;
     if (latch) {
         *latch ^= 1;
         key_push(*latch ? sc : (sc | 0x80));
@@ -168,7 +174,7 @@ static void osk_press(uint8_t sc) {
         key_tap(0x27);
         if (!latched_shift) key_push(0x2A | 0x80);
     } else key_tap(sc);
-    if (latched_shift) { key_push(0x2A | 0x80); latched_shift = 0; }
+    if (latched_shift == 1) { key_push(0x2A | 0x80); latched_shift = 0; }   /* 2 = locked: stays down */
     if (latched_ctrl)  { key_push(0x1D | 0x80); latched_ctrl = 0; }
     if (latched_alt)   { key_push(0x38 | 0x80); latched_alt = 0; }
 }
@@ -438,8 +444,10 @@ static void draw_bands(uint8_t* fb) {
                 const OSK_KEY* k = &osk_rows[r][c];
                 int w = key_w(k);
                 uint8_t bg = 1, fg = 15;
-                if ((k->sc == 0x2A && latched_shift) || (k->sc == 0x1D && latched_ctrl) || (k->sc == 0x38 && latched_alt)) bg = 4;
                 if (k->sc >= 0xF0) bg = 2;
+                /* latched for the next key = green, Shift locked = red */
+                if ((k->sc == 0x2A && latched_shift == 1) || (k->sc == 0x1D && latched_ctrl) || (k->sc == 0x38 && latched_alt)) bg = 2;
+                if (k->sc == 0x2A && latched_shift == 2) bg = 4;
                 if (r == osk_row && c == osk_col) { bg = 14; fg = 0; }
                 ui_fill(fb, x, y, w - 1, 8, bg);
                 ui_text(fb, x + 2, y, k->label, fg, bg);
@@ -748,6 +756,13 @@ static void feed_frame_step(void) {
         } else if (!strncmp(feed_line, "disk ", 5)) {
             if (biosdisk_insert(&machine.CPU, 0, arg) == 0) snprintf(drive_a, sizeof(drive_a), "%.47s", strrchr(arg, '/') ? strrchr(arg, '/') + 1 : arg);
             else printf("[feed] cannot open %s\n", arg);
+        } else if (!strncmp(feed_line, "osk ", 4)) {      /* press an on-screen key by its label */
+            int hit = 0;
+            for (int r = 0; r < OSK_ROWS && !hit; r++)
+                for (int c = 0; osk_rows[r][c].label && !hit; c++)
+                    if (!strcmp(osk_rows[r][c].label, arg)) { osk_press(osk_rows[r][c].sc); hit = 1; }
+            if (!hit) printf("[feed] no OSK key %s\n", arg);
+            else printf("[feed] shift latch %d\n", latched_shift);
         } else if (!strcmp(feed_line, "eject")) {
             insert_a(EJECT_ENTRY);
         } else if (!strcmp(feed_line, "screen")) {
