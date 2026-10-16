@@ -122,6 +122,10 @@ static void adlib_write(void* u, uint32_t port, uint8_t val) {
 	else opl_write_reg(index_latch, val);
 }
 
+/* the Sound Blaster answers the same chip at 228h/229h (sb_hle.c) */
+uint8_t adlib_hle_port_read(uint32_t port) { return adlib_read(NULL, port); }
+void adlib_hle_port_write(uint32_t port, uint8_t val) { adlib_write(NULL, port, val); }
+
 void adlib_hle_init(const uint64_t* exec, const uint32_t* ips) {
 	exec_ctr = exec; ips_ptr = ips;
 	last_exec = exec ? *exec : 0;

@@ -179,6 +179,12 @@ precisión de una instrucción y promediado en cada muestra (sin el zumbido ni l
 XTulator); también suena el altavoz manejado "a mano" (sonido digitalizado por el bit 1 del 61h).
 Con PAUSE/SET + cruceta se ven las barras de volumen y brillo de retro-go.
 
+**AdLib y Sound Blaster.** El core emula una tarjeta AdLib (OPL2, puertos 388h/389h; sintetizador
+emu8950, el mismo del port de Doom para la Game & Watch) y una Sound Blaster 2.0 (puerto 220h, IRQ 7,
+DMA 1: `BLASTER=A220 I7 D1 T3`). Los juegos que las detectan solos las usan sin hacer nada; en los que
+preguntan, elige AdLib o Sound Blaster con esos valores. El modo percusión del OPL2 no está
+emulado. La música AdLib pide CPU: el regulador de velocidad bajará algo los MHz en esos juegos.
+
 ## Cómo está hecho
 
 ```

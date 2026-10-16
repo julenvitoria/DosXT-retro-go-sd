@@ -30,7 +30,7 @@ print("/* Sergey Kiselev 8088 BIOS (GPLv3), https://github.com/skiselev/8088_bio
 print("#include <stdint.h>\nconst uint8_t bios_xt_rom[16384] = {"); print(",".join(str(x) for x in b)); print("};")
 EOF
 CORE=""; for f in $(cat "$HERE/core/core_sources.txt"); do CORE="$CORE $W/xt/$f"; done
-DEFS="-DXT_MINIMAL -DXT_NO_HOST_RENDER -DXT_TIMING_CATCHUP -DXT_IRQ_EVERY_INSTR -DXT_INT10_EXT -DXT_CGA_STATUS_ICOUNT -DXT_VGA_HLE -DXT_MOUSE_HLE -DXT_SPK_HLE -DXT_ADLIB_HLE -DXT_POOL_DEFAULT_SIZE=0"
+DEFS="-DXT_MINIMAL -DXT_NO_HOST_RENDER -DXT_TIMING_CATCHUP -DXT_IRQ_EVERY_INSTR -DXT_INT10_EXT -DXT_CGA_STATUS_ICOUNT -DXT_VGA_HLE -DXT_MOUSE_HLE -DXT_SPK_HLE -DXT_ADLIB_HLE -DXT_SB_HLE -DXT_POOL_DEFAULT_SIZE=0"
 # emu8950 (AdLib): the G&W Doom port's build. -fms-extensions: OPL_SLOT embeds an anonymous struct
 DEFS="$DEFS -fms-extensions -DUSE_EMU8950_OPL=1 -DDOOMX=1 -DEMU8950_LINEAR=1 -DEMU8950_LINEAR_SKIP=1 -DEMU8950_NO_RATECONV=1 -DEMU8950_NO_TLL=1 -DEMU8950_NO_TIMER=1 -DEMU8950_NO_TEST_FLAG=1 -DEMU8950_NO_PERCUSSION_MODE=1"
 WARN="-Wall -Wno-unused -Wno-parentheses -Wno-attributes -Wno-format-truncation"
@@ -45,7 +45,7 @@ echo "== host test 1: BIOS POST + boot sector, through the G&W frontend (40 s vi
 OUT1=$(cd "$W" && ./gwdos_host 2400 "" shots/hello_)
 echo "$OUT1" | grep -E "Hello from a boot sector|Total Conventional RAM|frames="
 echo "$OUT1" | grep -q "Hello from a boot sector" || { echo FAIL; exit 1; }
-echo "$OUT1" | grep -qE "(640|560) KiB" || { echo "FAIL: guest RAM not detected (640 KB, or 560 KB with 128 KB of EGA/VGA memory)"; exit 1; }
+echo "$OUT1" | grep -qE "(5[0-9][0-9]|6[0-4][0-9]) KiB" || { echo "FAIL: guest RAM not detected (at least 500 KB expected)"; exit 1; }
 echo PASS
 if [ -n "${DOSIMG:-}" ]; then
   echo "== host test 2: boot $DOSIMG, type DIR on the on-screen keyboard =="

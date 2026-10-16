@@ -446,6 +446,12 @@ void spk_hle_frame_end(void);
 void adlib_hle_init(const uint64_t* exec, const uint32_t* ips);
 void adlib_hle_render_mix(int16_t* dst, unsigned n, unsigned rate);
 #endif
+#ifdef XT_SB_HLE
+void sb_hle_init(I8237_t* d, I8259_t* p, const uint64_t* exec, const uint32_t* ips);
+void sb_hle_chunk(uint32_t done);
+void sb_hle_tick(uint32_t done, uint32_t n);
+void sb_hle_render_mix(int16_t* dst, unsigned n, uint32_t frame_instr);
+#endif
 
 static void run_frame(void) {
     /* exactly ips/60 instructions per frame on average: the remainder carries over and the
@@ -468,7 +474,13 @@ static void run_frame(void) {
 #ifdef XT_SPK_HLE
         spk_hle_chunk(done, chunk);
 #endif
+#ifdef XT_SB_HLE
+        sb_hle_chunk(done);
+#endif
         cpu_exec(&machine.CPU, chunk);
+#ifdef XT_SB_HLE
+        sb_hle_tick(done, chunk);              /* DMA samples due in this block, IRQ 7 */
+#endif
         uint32_t t = chunk * 1000000u + vt_rem;            /* advance virtual time */
         timing_virtual_us += t / ips;
         vt_rem = t % ips;
@@ -487,6 +499,9 @@ static void run_frame(void) {
     (void)si;
 #ifdef XT_ADLIB_HLE
     adlib_hle_render_mix(audio, PLAT_AUDIO_SAMPLES, PLAT_AUDIO_RATE);   /* AdLib music on top */
+#endif
+#ifdef XT_SB_HLE
+    sb_hle_render_mix(audio, PLAT_AUDIO_SAMPLES, target);               /* and digitised sound */
 #endif
 #else
     int16_t last = si ? audio[si - 1] : 0;
@@ -864,6 +879,9 @@ int dos_main(int start_paused) {
 #endif
 #ifdef XT_ADLIB_HLE
     if (ok) adlib_hle_init(&machine.CPU.totalexec, &ips);
+#endif
+#ifdef XT_SB_HLE
+    if (ok) sb_hle_init(&machine.i8237, &machine.i8259, &machine.CPU.totalexec, &ips);
 #endif
 
     if (ok) insert_boot_disks();
