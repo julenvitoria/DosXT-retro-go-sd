@@ -281,8 +281,21 @@ static uint32_t nav_repeat(uint32_t b, uint32_t pressed) {
     return pressed;
 }
 
+static int run_state;                     /* "run =" autotyping (below): non-zero while it works */
+
 static void handle_input(uint32_t b) {
     uint32_t pressed = b & ~prev_buttons;
+    /* While "run =" is still typing its commands, a button press would land in the middle
+       of them: Esc cancels the DOS line (DOS prints "\" and drops to a new line with no
+       prompt), the autotyper never sees a prompt again and the game never starts until
+       Enter is pressed by hand. So the pad (not the on-screen keyboard's door) waits. */
+    if (ui_mode == 0 && run_state) {
+        uint32_t door = 0;
+        for (int i = 0; i < GC_BUTTONS; i++)
+            if (padkeys[i][0] == GC_KEY_KEYBOARD) door |= 1u << i;
+        b &= door;
+        pressed &= door;
+    }
     if (ui_mode != 0) pressed = nav_repeat(b, pressed);
     if (ui_mode == 0) {
         int osk = -1;
@@ -338,7 +351,7 @@ void dos_info_set(int on) { info_on = on ? 1 : 0; plat_setting_set("InfoBar", in
    PIT -- music tempo and note pitch -- stays right; only CPU-bound game logic runs slower,
    exactly as if a slower speed had been picked by hand. */
 #define IPS_MIN 300000u
-static void speed_governor(uint32_t frames, uint32_t ms, uint32_t load) {
+static void speed_governor(uint32_t frames, uint32_t ms, uint32_t load, uint32_t late) {
     uint32_t ceiling = speeds[speed_idx].ips;
     if (!ms || ms > 1500) return;      /* a long stall is retro-go's menu or a disk load, not speed */
     uint32_t fps10 = frames * 10000u / ms;                 /* frames/s x 10 */
@@ -348,8 +361,14 @@ static void speed_governor(uint32_t frames, uint32_t ms, uint32_t load) {
        hand-off land late. So the emulation's own share of the time is held at ~70 % too. */
     uint64_t n = ips;
     if (fps10 < 575) n = n * fps10 / 600u;
+    /* Third signal: frames that came in LATE. On the console a late frame does not drop
+       sound, it REPEATS it -- the audio DMA plays the previous 16.7 ms block again -- and
+       that is the click heard in Monkey Island with AdLib music at 11 MHz / ~70 %: in a
+       recording, the audio around each click correlates with itself one frame earlier
+       (0.69, against 0.31 elsewhere). Two or more late frames in the half second cost 7 %. */
     if (load > 80) n = n * 70u / load;
-    else if (fps10 >= 575 && load < 55 && ips < ceiling) n = n + n / 10;   /* headroom */
+    else if (late >= 2) n = n * 93u / 100u;
+    else if (fps10 >= 575 && load < 55 && !late && ips < ceiling) n = n + n / 10;   /* headroom */
     ips = n < IPS_MIN ? IPS_MIN : (uint32_t)n;
     if (ips > ceiling) ips = ceiling;
 }
@@ -523,7 +542,7 @@ static void run_frame(void) {
    the ASCII code itself, independent of KEYB's keyboard layout. Each command is typed
    only when a DOS prompt ("X:\...>" with the cursor right after it) is on screen. */
 static const char* run_ptr = NULL;
-static int run_state = 0;                 /* 0 idle, 1 wait prompt, 2 typing, 3 wait next prompt */
+/* run_state: 0 idle, 1 wait prompt, 2 typing, 3 wait next prompt (declared above) */
 static int prompt_frames = 0;
 static uint16_t run_cursor = 0;
 
@@ -894,7 +913,7 @@ int dos_main(int start_paused) {
 
     if (ok) insert_boot_disks();
 
-    uint32_t sec_t0 = plat_ms(), emu_ms = 0, frame_no = 0, win_frames = 0;
+    uint32_t sec_t0 = plat_ms(), emu_ms = 0, frame_no = 0, win_frames = 0, win_late = 0, last_ms = plat_ms();
     for (;;) {
         bool draw = plat_frame_begin();
         /* the LCD switches to 8-bit mode at a vsync and the CLUT is ignored until then:
@@ -921,10 +940,12 @@ int dos_main(int start_paused) {
         }
 #endif
         win_frames++;
+        if (now - last_ms >= 20 && now - last_ms < 200) win_late++;   /* a frame is 16.7 ms */
+        last_ms = now;
         if (now - sec_t0 >= 500) {                     /* every half second: load and speed */
             load_pct = emu_ms * 100u / (now - sec_t0);
-            if (ok) speed_governor(win_frames, now - sec_t0, load_pct);
-            emu_ms = 0; win_frames = 0; sec_t0 = now;
+            if (ok) speed_governor(win_frames, now - sec_t0, load_pct, win_late);
+            emu_ms = 0; win_frames = 0; win_late = 0; sec_t0 = now;
         }
         if (draw) {
             draw_screen(plat_framebuffer());
