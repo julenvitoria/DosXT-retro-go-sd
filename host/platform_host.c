@@ -167,6 +167,7 @@ void plat_setting_set(const char* key, int32_t v) {
 }
 
 uint32_t plat_ms(void) { return (uint32_t)(clock() * 1000.0 / CLOCKS_PER_SEC); }
+uint32_t plat_cycles(void) { return (uint32_t)clock(); }
 
 int main(int argc, char** argv) {
     if (argc < 2) { fprintf(stderr, "usage: %s <frames> [script] [shot_prefix]\n", argv[0]); return 2; }

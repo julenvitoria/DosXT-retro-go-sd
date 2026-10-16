@@ -57,3 +57,5 @@ void    plat_setting_set(const char* key, int32_t value);
 
 /* Monotonic milliseconds (for the CPU-load meter only) */
 uint32_t plat_ms(void);
+/* Free-running CPU cycle counter (any rate; the governor calibrates it against plat_ms) */
+uint32_t plat_cycles(void);

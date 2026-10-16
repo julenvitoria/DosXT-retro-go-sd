@@ -369,26 +369,38 @@ void dos_info_set(int on) { info_on = on ? 1 : 0; plat_setting_set("InfoBar", in
    PIT -- music tempo and note pitch -- stays right; only CPU-bound game logic runs slower,
    exactly as if a slower speed had been picked by hand. */
 #define IPS_MIN 300000u
-static void speed_governor(uint32_t frames, uint32_t ms, uint32_t busy, uint32_t late) {
+static void speed_governor(uint32_t frames, uint32_t ms, uint32_t busy, uint32_t misses) {
     static uint8_t hold;                   /* half seconds before it may speed up again */
+    static int32_t deficit;                /* frames behind the wall clock, x1000 */
+    static uint32_t cap;                   /* a speed that already lost frames: stay under it */
+    static uint16_t cap_left;              /* half seconds the cap still applies */
     uint32_t ceiling = speeds[speed_idx].ips;
     if (!ms || ms > 1500) return;      /* a long stall is retro-go's menu or a disk load, not speed */
-    uint32_t fps10 = frames * 10000u / ms;                 /* frames/s x 10 */
-    /* `busy` is the WHOLE frame -- emulation, drawing, AdLib, audio hand-off -- i.e. the time
-       NOT spent waiting for the audio DMA. The first version held only the emulation's
-       share, and on the console Monkey Island with AdLib still clicked at 9-10 MHz with
-       that share at ~60 %: the rest of the frame took the other 40 %, frames came in late
-       and the DMA replayed the previous 16.7 ms block (the click; see below). At a fixed
-       8 MHz, 54 %, it was clean.
-       Late frames also put the speed on HOLD for 10 s: creeping back up every clean half
-       second walked straight into the limit again, so the clicks came back periodically
-       (seen as 16->9.0 / 10.1 / 9.6 / 10.4 MHz in the same video). */
+    /* THE SIGNAL THAT MATTERS IS FRAMES BEHIND THE CLOCK. Each frame is 1/60 s of music; the
+       audio DMA plays 60 blocks a second whatever happens, so every frame that is not ready
+       in time stretches the music by 16.7 ms. The first versions let up to 4 % through
+       (fps >= 57.5) and judged the rest by load, which on the console reads 65-80 % while
+       frames are still being lost now and then: Monkey Island's AdLib music came out ~8 %
+       slow next to the same music rendered here, and "slowed down and sped up" as the
+       governor crept back up into the limit every 10 s. Now the frames owed are counted
+       against the clock across windows, and one whole frame owed is a cut. */
+    /* Leaky: a lone late frame (a heavy screen update, say) is lost whatever the speed and
+       must not walk the speed down; losses that keep coming are the CPU's. */
+    int32_t owed = (int32_t)(ms * 60u) - (int32_t)(frames * 1000u);   /* frames behind the clock */
+    int32_t missed = (int32_t)misses * 1000;                           /* blocks replayed */
+    deficit = deficit * 9 / 10 + (missed > owed ? missed : owed);      /* ~5 s memory */
+    if (deficit < -500) deficit = -500;
+    if (cap_left && !--cap_left) cap = 0;
     uint64_t n = ips;
-    if (fps10 < 575) { n = n * fps10 / 600u * 95u / 100u; hold = 20; }   /* frames lost */
-    else if (busy > 90) { n = n * 82u / busy; hold = 20; }                 /* no slack left */
-    else if (late) { n = n * 95u / 100u; hold = 20; }                      /* the odd heavy frame */
+    if (deficit >= 4000) {                     /* frames keep being lost: ~1 a second or more */
+        if (!cap || ips < cap) cap = ips;                     /* this speed is too much */
+        cap_left = 120;                                       /* for a minute */
+        n = n * 92u / 100u; hold = 20; deficit = 0;
+    }
+    else if (busy > 85) { n = n * 78u / busy; hold = 20; }    /* no slack left */
     else if (hold) hold--;
-    else if (busy < 75 && ips < ceiling) n = n + n / 25;                   /* +4 % */
+    else if (busy < 70 && ips < ceiling) n = n + n / 33;      /* +3 % */
+    if (cap && n > (uint64_t)cap * 95u / 100u) n = (uint64_t)cap * 95u / 100u;
     ips = n < IPS_MIN ? IPS_MIN : (uint32_t)n;
     if (ips > ceiling) ips = ceiling;
 }
@@ -1079,6 +1091,12 @@ int dos_main(int start_paused) {
     if (ok) insert_boot_disks();
 
     uint32_t sec_t0 = plat_ms(), emu_ms = 0, frame_no = 0, win_frames = 0, win_late = 0, last_ms = plat_ms(), wait_ms = 0;
+    /* frames that MISSED their audio block: plat_frame_end() came back without waiting, i.e.
+       the DMA had already moved on and is replaying the previous 16.7 ms. The frame rate
+       cannot see these -- the firmware catches up with back-to-back frames, so 60 frames
+       still go by every second while the music stretches (a recording had ~10 % of its
+       16.7 ms blocks repeated at a "60 fps", 70 % load setting). */
+    uint32_t win_miss = 0, win_c0 = plat_cycles(), cyc_per_ms = 0;   /* 0 until calibrated: no misses counted */
     for (;;) {
         uint32_t tw = plat_ms();
         bool draw = plat_frame_begin();
@@ -1111,15 +1129,26 @@ int dos_main(int start_paused) {
 #endif
         win_frames++;
         if (now - last_ms >= 20 && now - last_ms < 200) win_late++;   /* a frame is 16.7 ms */
+        (void)win_late;
         last_ms = now;
         if (now - sec_t0 >= 500) {                     /* every half second: load and speed */
             /* "carga" = the share of the time the console was busy, not waiting for audio */
             uint32_t win = now - sec_t0;
             load_pct = wait_ms >= win ? 0 : 100u - wait_ms * 100u / win;
 #ifndef GWDOS_HOST                                    /* the harness is not real time */
-            if (ok) speed_governor(win_frames, win, load_pct, win_late);
+            {
+                extern volatile uint32_t biosdisk_ops;
+                static uint32_t ops_seen;
+                uint32_t ops = biosdisk_ops;
+                /* a window with disk transfers waited for the SD card, not for the CPU */
+                if (ok && ops == ops_seen) speed_governor(win_frames, win, load_pct, win_miss);
+                ops_seen = ops;
+            }
 #endif
-            emu_ms = 0; win_frames = 0; win_late = 0; wait_ms = 0; sec_t0 = now;
+            {   uint32_t c = plat_cycles();                  /* recalibrate cycles per ms */
+                if (win) cyc_per_ms = (c - win_c0) / win;
+                win_c0 = c; }
+            emu_ms = 0; win_frames = 0; win_late = 0; win_miss = 0; wait_ms = 0; sec_t0 = now;
         }
         if (draw) {
             draw_screen(plat_framebuffer());
@@ -1127,7 +1156,9 @@ int dos_main(int start_paused) {
         }
         plat_audio(audio, PLAT_AUDIO_SAMPLES);
         tw = plat_ms();
+        uint32_t tc = plat_cycles();
         plat_frame_end();                              /* waits for the audio DMA: idle time */
+        if (plat_cycles() - tc < cyc_per_ms / 20) win_miss++;   /* under 50 us: no wait, late */
         wait_ms += plat_ms() - tw;
     }
     return 0;

@@ -52,6 +52,8 @@ void plat_init(bool start_paused) {
 
     lcd_setup_framebuffers(LCD_MODE_LUT8);   /* 8-bit indexed: frees ~150 KB of LCD pool */
     audio_start_playing(PLAT_AUDIO_SAMPLES);
+    *(volatile uint32_t*)0xE000EDFCu |= 1u << 24;          /* DEMCR.TRCENA */
+    *(volatile uint32_t*)0xE0001000u |= 1u;                /* DWT_CTRL.CYCCNTENA */
 }
 
 size_t plat_mem_region(int index, uint8_t** base) {
@@ -177,3 +179,5 @@ int32_t plat_setting_get(const char* key, int32_t def) { return odroid_settings_
 void plat_setting_set(const char* key, int32_t value) { odroid_settings_app_int32_set(key, value); }
 
 uint32_t plat_ms(void) { return HAL_GetTick(); }
+/* the Cortex-M7 cycle counter (DWT->CYCCNT), switched on in plat_init */
+uint32_t plat_cycles(void) { return *(volatile uint32_t*)0xE0001004u; }
