@@ -173,6 +173,7 @@ static void osk_press(uint8_t sc) {
 static char images[MAX_IMAGES][40];
 static int n_images = 0, disk_sel = 0;
 static char drive_a[48] = "", drive_b[48] = "", drive_c[48] = "";
+static char boot_missing[40];             /* the cfg's "boot =" image that was not found */
 
 static int ends_with_img(const char* s) {
     size_t n = strlen(s);
@@ -445,6 +446,12 @@ static void draw_bands(uint8_t* fb) {
             ui_text(fb, 0, 230, vga_plane_size < 65536 ? "Falta memoria de video: vram = 256 en cfg" : "Falta memoria de video", 12, 0);
 #endif
         if (early || info_on) ui_text(fb, 0, 221, line, 8, 0);
+        if (boot_missing[0]) {                           /* stays up: it is why nothing boots */
+            snprintf(line, sizeof(line), "No encuentro %.26s", boot_missing);
+            ui_fill(fb, 0, 0, 320, PIC_Y, 0);
+            ui_text(fb, 0, 2, line, 12, 0);
+            ui_text(fb, 0, 11, "Ponlo en /cores/dos o junto al juego", 12, 0);
+        }
     }
 }
 
@@ -732,7 +739,12 @@ static void insert_boot_disks(void) {
             if (file_size(bpath) <= 0) snprintf(bpath, sizeof(bpath), "%s/%s", dos_dir, gcfg.boot);
         }
         if (biosdisk_insert(&machine.CPU, 0, bpath) == 0) snprintf(drive_a, sizeof(drive_a), "%s", base_name(bpath));
-        else snprintf(drive_a, sizeof(drive_a), "(error)");
+        else {
+            /* without it the BIOS stops at "Booting OS" with nothing said: say it, and keep
+               saying it (draw_bands) -- the start-up lines are gone after 7 s */
+            snprintf(drive_a, sizeof(drive_a), "(falta)");
+            snprintf(boot_missing, sizeof(boot_missing), "%.30s", gcfg.boot);
+        }
         bootdrive = 0x00;
         if (size > (long)FLOPPY_MAX_BYTES) {
             if (biosdisk_insert(&machine.CPU, 2, (char*)boot) == 0) snprintf(drive_c, sizeof(drive_c), "%s", base_name(boot));
@@ -753,7 +765,7 @@ static void insert_boot_disks(void) {
         return;
     }
     if (biosdisk_insert(&machine.CPU, 0, (char*)boot) == 0) snprintf(drive_a, sizeof(drive_a), "%s", base_name(boot));
-    else snprintf(drive_a, sizeof(drive_a), "(error)");
+    else { snprintf(drive_a, sizeof(drive_a), "(error)"); snprintf(boot_missing, sizeof(boot_missing), "%.30s", base_name(boot)); }
     bootdrive = 0x00;
 
     char cpath[320];
