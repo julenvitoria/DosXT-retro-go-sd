@@ -166,7 +166,21 @@ static uint32_t f_len;                     /* instructions in this frame */
 static uint32_t blk_done, blk_len;        /* the block of instructions being run */
 static uint64_t blk_exec0;
 
+#ifdef GWDOS_PROF
+uint32_t adlib_prof_cyc;                   /* cycles spent synthesising (profiling builds) */
+uint32_t plat_cycles(void);
+#endif
+static void render_samples_(unsigned upto);
 static void render_samples(unsigned upto) {
+#ifdef GWDOS_PROF
+	uint32_t c0 = plat_cycles();
+	render_samples_(upto);
+	adlib_prof_cyc += plat_cycles() - c0;
+#else
+	render_samples_(upto);
+#endif
+}
+static void render_samples_(unsigned upto) {
 	if (upto > f_n) upto = f_n;
 	if (upto <= f_done) return;
 	if (!opl || !opl_active()) {
