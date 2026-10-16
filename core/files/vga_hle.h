@@ -39,5 +39,4 @@ void vga_hle_render(uint8_t* fb, uint8_t base16);
 void vga_hle_palette16(uint32_t* out);
 void vga_hle_palette256(uint32_t* out);
 
-uint32_t vga_hle_frame_key(void);
 #endif
