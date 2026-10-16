@@ -110,6 +110,7 @@ static void key_tap(uint8_t sc) { key_push(sc); key_push(sc | 0x80); }
 #define SC_DISK 0xF0
 #define SC_CPU  0xF1
 #define SC_ZOOM 0xF2
+#define SC_COLON 0xF3                     /* ":" in one key: Shift + ";" */
 typedef struct { const char* label; uint8_t sc; } OSK_KEY;
 /* four rows: 0-1 in the band above the picture, 2-3 in the band below. A key is
    label x 8 + 4 pixels wide; every row fits in 320. */
@@ -117,7 +118,7 @@ static const OSK_KEY osk_r0[] = { {"Esc",0x01},{"1",0x02},{"2",0x03},{"3",0x04},
                                   {"F1",0x3B},{"F2",0x3C},{"F3",0x3D},{"F4",0x3E},{"F5",0x3F},{"F6",0x40},{NULL,0} };
 static const OSK_KEY osk_r1[] = { {"Tab",0x0F},{"Q",0x10},{"W",0x11},{"E",0x12},{"R",0x13},{"T",0x14},{"Y",0x15},{"U",0x16},{"I",0x17},{"O",0x18},{"P",0x19},{"[",0x1A},{"]",0x1B},{"Ent",0x1C},
                                   {"F7",0x41},{"F8",0x42},{"F9",0x43},{"F10",0x44},{"Del",0x53},{NULL,0} };
-static const OSK_KEY osk_r2[] = { {"Ctl",0x1D},{"A",0x1E},{"S",0x1F},{"D",0x20},{"F",0x21},{"G",0x22},{"H",0x23},{"J",0x24},{"K",0x25},{"L",0x26},{";",0x27},{"'",0x28},{"\\",0x2B},{"`",0x29},
+static const OSK_KEY osk_r2[] = { {"Ctl",0x1D},{"A",0x1E},{"S",0x1F},{"D",0x20},{"F",0x21},{"G",0x22},{"H",0x23},{"J",0x24},{"K",0x25},{"L",0x26},{";",0x27},{":",SC_COLON},{"'",0x28},{"\\",0x2B},{"`",0x29},
                                   {"Ins",0x52},{"80c",SC_ZOOM},{"CPU",SC_CPU},{"A:",SC_DISK},{NULL,0} };
 static const OSK_KEY osk_r3[] = { {"Shf",0x2A},{"Z",0x2C},{"X",0x2D},{"C",0x2E},{"V",0x2F},{"B",0x30},{"N",0x31},{"M",0x32},{",",0x33},{".",0x34},{"/",0x35},{"Alt",0x38},{"Spc",0x39},
                                   {"\x18",0x48},{"\x19",0x50},{"\x1B",0x4B},{"\x1A",0x4D},{"Hom",0x47},{"End",0x4F},{NULL,0} };
@@ -162,7 +163,11 @@ static void osk_press(uint8_t sc) {
         key_push(*latch ? sc : (sc | 0x80));
         return;
     }
-    key_tap(sc);
+    if (sc == SC_COLON) {                 /* to change drive (A:, C:) without the Shift latch */
+        if (!latched_shift) key_push(0x2A);
+        key_tap(0x27);
+        if (!latched_shift) key_push(0x2A | 0x80);
+    } else key_tap(sc);
     if (latched_shift) { key_push(0x2A | 0x80); latched_shift = 0; }
     if (latched_ctrl)  { key_push(0x1D | 0x80); latched_ctrl = 0; }
     if (latched_alt)   { key_push(0x38 | 0x80); latched_alt = 0; }
@@ -172,7 +177,7 @@ static void osk_press(uint8_t sc) {
 #define MAX_IMAGES 24
 static char images[MAX_IMAGES][40];
 static int n_images = 0, disk_sel = 0;
-static char drive_a[48] = "", drive_b[48] = "", drive_c[48] = "";
+static char drive_a[48] = "", drive_b[48] = "", drive_c[48] = "", drive_d[48] = "";
 static char boot_missing[40];             /* the cfg's "boot =" image that was not found */
 
 static int ends_with_img(const char* s) {
@@ -434,7 +439,9 @@ static void draw_bands(uint8_t* fb) {
         } else {
             ui_text(fb, 0, 2, "A=Intro B=Espacio GAME=Esc TIME=Teclado", 7, 0);
         }
-        if (drive_b[0])
+        if (drive_d[0])
+            snprintf(line, sizeof(line), "A:%.11s C:%.11s D:%.9s", drive_a[0] ? drive_a : "-", drive_c, drive_d);
+        else if (drive_b[0])
             snprintf(line, sizeof(line), "A:%.11s B:%.11s C:%.9s", drive_a[0] ? drive_a : "-", drive_b, drive_c[0] ? drive_c : "-");
         else
             snprintf(line, sizeof(line), "A:%.14s C:%.14s", drive_a[0] ? drive_a : "-", drive_c[0] ? drive_c : "-");
@@ -843,6 +850,19 @@ static void insert_boot_disks(void) {
         else {                                       /* /cores/dos/<boot>, else next to the game */
             snprintf(bpath, sizeof(bpath), "%s/%s", GWDOS_CFG_DIR, gcfg.boot);
             if (file_size(bpath) <= 0) snprintf(bpath, sizeof(bpath), "%s/%s", dos_dir, gcfg.boot);
+        }
+        if (file_size(bpath) > (long)FLOPPY_MAX_BYTES) {
+            /* "boot =" a hard disk (DOS installed on c.img): it is C: and boots; the game goes
+               in A: if it is a floppy, else it is the second hard disk, D: */
+            if (biosdisk_insert(&machine.CPU, 2, bpath) == 0) snprintf(drive_c, sizeof(drive_c), "%s", base_name(bpath));
+            else snprintf(boot_missing, sizeof(boot_missing), "%.30s", gcfg.boot);
+            bootdrive = 0x80;
+            if (size > (long)FLOPPY_MAX_BYTES) {
+                if (biosdisk_insert(&machine.CPU, 3, (char*)boot) == 0) snprintf(drive_d, sizeof(drive_d), "%s", base_name(boot));
+            } else if (biosdisk_insert(&machine.CPU, 0, (char*)boot) == 0) {
+                snprintf(drive_a, sizeof(drive_a), "%s", base_name(boot));
+            } else snprintf(drive_a, sizeof(drive_a), "(error)");
+            return;
         }
         if (biosdisk_insert(&machine.CPU, 0, bpath) == 0) snprintf(drive_a, sizeof(drive_a), "%s", base_name(bpath));
         else {
