@@ -408,7 +408,13 @@ static void speed_governor(uint32_t frames, uint32_t ms, uint32_t busy, uint32_t
     if (deficit < -500) deficit = -500;
     if (cap_left && !--cap_left) cap = 0;
     uint64_t n = ips;
-    if (deficit >= 4000) {                     /* frames keep being lost: ~1 a second or more */
+    /* ...and only with the console actually busy, or frames visibly short of 60 a second (an
+       overrun frame takes two DMA slots, so a badly overloaded console can READ ~55 % busy):
+       at 8 MHz with ~40 % idle the console
+       still reported the odd missed block (the firmware's own hiccups -- an SD access, its
+       frame pacing) and the governor cut 8 -> 7.4-7.6 MHz for nothing. */
+    uint32_t fps10 = frames * 10000u / ms;                   /* frames/s x 10 */
+    if (deficit >= 4000 && (busy >= 75 || fps10 < 575)) {  /* frames keep being lost: ~1/s or more */
         if (!cap || ips < cap) cap = ips;                     /* this speed is too much */
         cap_left = 120;                                       /* for a minute */
         n = n * 92u / 100u; hold = 20; deficit = 0;
