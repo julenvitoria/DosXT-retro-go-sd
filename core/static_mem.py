@@ -264,6 +264,22 @@ b = sub(b, """	default:
 		cpu->cf = 1;
 	}
 	lastah = cpu->regs.byteregs[regah];""")
+# biosdisk_write: hand the sectors to the file system now. The C library holds the last
+# fwrite() in its buffer until the next seek, and on the console that buffer is gone if the
+# power is cut -- the last thing DOS wrote (often the FAT or a directory) would be lost and
+# the disk image left inconsistent. fseek() to where we are flushes it (newlib's fseek always
+# does) and needs nothing beyond what the core ABI already offers.
+b = sub(b, """		fwrite(biosdisk_sectbuf, 1, 512, biosdisk[drivenum].diskfile);
+	}""", """		fwrite(biosdisk_sectbuf, 1, 512, biosdisk[drivenum].diskfile);
+	}
+	fseek(biosdisk[drivenum].diskfile, 0L, SEEK_CUR);""")
+# INT 19h: with the boot floppy taken out (the disk menu can empty A:) boot from the hard
+# disk, as a PC BIOS does -- what an installer's "remove the disk and press ENTER" expects.
+b = sub(b, """	cpu->regs.byteregs[regdl] = bootdrive;
+	biosdisk_read(""", """	cpu->regs.byteregs[regdl] = bootdrive;
+	if (!(bootdrive & 0x80) && !biosdisk[bootdrive & 1].inserted && biosdisk[2].inserted)
+		cpu->regs.byteregs[regdl] = 0x80;
+	biosdisk_read(""")
 wr("modules/disk/biosdisk.c", b)
 
 # cpu.c: int_callback assignment has a mismatched pointer type (error on GCC >= 14)

@@ -1,4 +1,5 @@
-# Minimal FAT12 disk-image tool for gw-dos: floppies and small (<= 16 MB) hard disk images.
+# Minimal FAT disk-image tool for gw-dos: floppies (FAT12) and hard disk images (FAT12 up to
+# 16 MB, FAT16 above, up to 500 MB).
 #   fat12.py ls  <img>
 #   fat12.py cat <img> <NAME.EXT>
 #   fat12.py put <img> <NAME.EXT> <hostfile>   (rewrites an existing file in place; new data must
@@ -13,7 +14,9 @@
 #                                              MSDOS.SYS, COMMAND.COM from an MS-DOS boot disk)
 #                                              + files; --run writes an AUTOEXEC.BAT that starts it
 #   fat12.py newhd <img> [--size MB] [file|folder ...]
-#                                              hard disk image (partitioned, FAT12, up to 16 MB);
+#                                              hard disk image (partitioned; FAT12 up to 16 MB,
+#                                              FAT16 up to 500 MB; its MBR boots the active
+#                                              partition, so DOS can be installed on it);
 #                                              each PC folder becomes a subdirectory (e.g. C:\\LOOM)
 #   fat12.py todsk <game.img|folder> <GAME.dsk> [--run "CMD;CMD"]
 #                                              a .dsk for the TinyEMU core: copies the image (or
@@ -43,21 +46,36 @@ def entries(img):
         clus, size = struct.unpack_from("<HI", e, 26)
         yield off, name, e[11], clus, size
 
+def is_fat16(img):
+    # the FAT type is decided by the cluster count alone (Microsoft's rule)
+    return total_clusters(img) >= 4085
+
+def eoc(img):
+    """end-of-chain marker for this volume"""
+    return 0xFFFF if is_fat16(img) else 0xFFF
+
 def fat_next(img, c):
     bps, spc, rsv, *_ = geom(img)
     fat = rsv * bps
+    if is_fat16(img):
+        return struct.unpack_from("<H", img, fat + c * 2)[0]
     v = struct.unpack_from("<H", img, fat + c * 3 // 2)[0]
     return (v >> 4) if c & 1 else (v & 0xFFF)
 
 def chain(img, c):
     out = []
-    while 2 <= c < 0xFF8:
+    end = 0xFFF8 if is_fat16(img) else 0xFF8
+    while 2 <= c < end:
         out.append(c); c = fat_next(img, c)
     return out
 
 def fat_set(img, c, v):
     bps, spc, rsv, nfat, nroot, spf, root, data = geom(img)
+    f16 = is_fat16(img)
     for k in range(nfat):
+        if f16:
+            struct.pack_into("<H", img, (rsv + k * spf) * bps + c * 2, v)
+            continue
         off = (rsv + k * spf) * bps + c * 3 // 2
         cur = struct.unpack_from("<H", img, off)[0]
         cur = (cur & 0x000F) | (v << 4) if c & 1 else (cur & 0xF000) | v
@@ -69,8 +87,12 @@ def total_clusters(img):
     return (tot * bps - data) // (bps * spc)
 
 def free_bytes(img):
-    bps, spc, *_ = geom(img)
-    return sum(1 for c in range(2, total_clusters(img) + 2) if fat_next(img, c) == 0) * bps * spc
+    bps, spc, rsv, *_ = geom(img)
+    n = total_clusters(img)
+    if is_fat16(img):
+        fat = struct.unpack_from("<%dH" % (n + 2), img, rsv * bps)
+        return sum(1 for v in fat[2:] if v == 0) * bps * spc
+    return sum(1 for c in range(2, n + 2) if fat_next(img, c) == 0) * bps * spc
 
 def dos83(fn):
     base, ext = os.path.splitext(os.path.basename(fn))
@@ -107,7 +129,7 @@ def free_slot(img, dir_cluster, name):
         new = alloc_clusters(img, 1)
         if not new: sys.exit("disk full")
         last = chain(img, dir_cluster)[-1]
-        fat_set(img, last, new[0]); fat_set(img, new[0], 0xFFF)
+        fat_set(img, last, new[0]); fat_set(img, new[0], eoc(img))
         img[data + (new[0] - 2) * csize: data + (new[0] - 1) * csize] = bytes(csize)
         slot = data + (new[0] - 2) * csize
     if slot is None: sys.exit("root directory full")
@@ -124,7 +146,7 @@ def make_dir(img, b, parent=0, mtime=None):
     slot = free_slot(img, parent, name)
     c = alloc_clusters(img, 1)
     if not c: sys.exit("disk full")
-    c = c[0]; fat_set(img, c, 0xFFF)
+    c = c[0]; fat_set(img, c, eoc(img))
     dt, dd = dos_datetime(mtime)
     blk = bytearray(csize)
     blk[0:32] = b".          " + bytes([0x10]) + bytes(10) + struct.pack("<HHHI", dt, dd, c, 0)
@@ -155,7 +177,7 @@ def add_bytes(img, b, e, content, attr=0x20, mtime=None, dir_cluster=0, prefix="
     if len(free) < need:
         sys.exit("%s does not fit: needs %d bytes, image has %d free" % (hostfile, need * csize, free_bytes(img)))
     for i, c in enumerate(free):
-        fat_set(img, c, free[i + 1] if i + 1 < len(free) else 0xFFF)
+        fat_set(img, c, free[i + 1] if i + 1 < len(free) else eoc(img))
         chunk = content[i * csize:(i + 1) * csize]
         img[data + (c - 2) * csize: data + (c - 1) * csize] = chunk + b"\0" * (csize - len(chunk))
     dtime, ddate = dos_datetime(mtime)
@@ -215,53 +237,73 @@ def new_floppy(label="GWDOS"):
     return img
 
 HD_HEADS, HD_SPT = 16, 63                 # gw-dos (XTulator biosdisk) hard disk geometry
+HD_MAX_MB = 500                           # 1024 cylinders of 16 x 63 sectors: the INT 13h limit
+
+# MBR boot code (tools/src/mbr.asm): loads the active partition's boot sector, like MS-DOS's own
+MBR_CODE = bytes.fromhex(
+    "fa31c08ed0bc007c8ed88ec0fbfcbe007cbf0006b90001f3a5ea1e060000bebe07b90400f60480750a83c610e2f6"
+    "be7706eb33bf0500bb007cb801028a74018b4c0256cd135e730c31c0cd134f75e7be8e06eb12813efe7d55aa7405"
+    "bea706eb05ea007c0000ac08c07409b40ebb0700cd10ebf2f4ebfd53696e20706172746963696f6e206163746976"
+    "610d0a004572726f72206c6579656e646f20656c20646973636f0d0a00446973636f2073696e2073697374656d61"
+    "3a20617272616e636120646573646520756e206469737175657465206520696e7374616c6120444f5320286f2053"
+    "595320433a290d0a00")
 
 def new_hd(size_mb):
     cyl_bytes = HD_HEADS * HD_SPT * 512
     cyls = max(6, min(1024, int(round(size_mb * 1024 * 1024 / cyl_bytes))))   # >= 3 MB: smaller is taken for a floppy
     total = cyls * HD_HEADS * HD_SPT
     psec = total - HD_SPT                                # partition starts at LBA 63 (cyl 0, head 1)
-    spc = 8
-    while True:                                          # FAT12 must stay below 4085 clusters
+    def layout(spc, f16):
         spf = 1
         while True:
             clusters = (psec - 1 - 2 * spf - 32) // spc
-            if (clusters + 2) * 3 // 2 <= spf * 512: break
+            need = (clusters + 2) * 2 if f16 else (clusters + 2) * 3 // 2
+            if need <= spf * 512: return spf, clusters
             spf += 1
+    spc = 8; f16 = False
+    while True:                                          # FAT12 while it stays below 4085 clusters
+        spf, clusters = layout(spc, False)
         if clusters < 4085: break
         spc *= 2
-        if spc > 64: sys.exit("too big for FAT12: use --size 16 or less")
+        if spc > 16: f16 = True; break
+    if f16:                                              # FAT16: MS-DOS FORMAT's cluster sizes
+        spc = 4
+        while True:
+            spf, clusters = layout(spc, True)
+            if 4085 <= clusters < 65525: break
+            spc *= 2
+            if spc > 64: sys.exit("too big for FAT16")
     disk = bytearray(total * 512)
-    # MBR: tiny message (boot from a floppy instead) + one FAT12 partition
-    msg = b"Disco duro de datos de gw-dos: arranca el DOS desde un disquete.\r\n"
-    code = bytes([0xFA, 0x31, 0xC0, 0x8E, 0xD8, 0x8E, 0xD0, 0xBC, 0x00, 0x7C, 0xFB, 0xBE, 0x1C, 0x7C,
-                  0xAC, 0x08, 0xC0, 0x74, 0x06, 0xB4, 0x0E, 0xCD, 0x10, 0xEB, 0xF5, 0xF4, 0xEB, 0xFD])
-    disk[0:len(code)] = code
-    disk[0x1C:0x1C + len(msg)] = msg
+    disk[0:len(MBR_CODE)] = MBR_CODE
     def chs(lba):
         c = lba // (HD_HEADS * HD_SPT); h = (lba // HD_SPT) % HD_HEADS; sct = lba % HD_SPT + 1
         return bytes([h, ((c >> 2) & 0xC0) | sct, c & 0xFF])
-    pe = bytes([0x80]) + chs(HD_SPT) + bytes([0x01]) + chs(total - 1) + struct.pack("<II", HD_SPT, psec)
+    ptype = 0x01 if not f16 else (0x04 if psec < 65536 else 0x06)
+    pe = bytes([0x80]) + chs(HD_SPT) + bytes([ptype]) + chs(total - 1) + struct.pack("<II", HD_SPT, psec)
     disk[0x1BE:0x1CE] = pe
     disk[510:512] = b"\x55\xAA"
-    # partition boot sector (BPB) + FATs + root directory
+    # partition boot sector (BPB) + FATs + root directory; until DOS is installed (SYS C:) its
+    # code just says so
+    msg = b"Disco sin sistema: arranca desde un disquete e instala DOS (o SYS C:)\r\n"
+    code = bytes([0xFA, 0x31, 0xC0, 0x8E, 0xD8, 0x8E, 0xD0, 0xBC, 0x00, 0x7C, 0xFB, 0xBE, 0x5A, 0x7C,
+                  0xAC, 0x08, 0xC0, 0x74, 0x06, 0xB4, 0x0E, 0xCD, 0x10, 0xEB, 0xF5, 0xF4, 0xEB, 0xFD])
     vol = bytearray(psec * 512)
     vol[0:3] = bytes([0xEB, 0x3C, 0x90]); vol[3:11] = b"MSDOS5.0"
     struct.pack_into("<HBHBHHBHHHII", vol, 11, 512, spc, 1, 2, 512, psec if psec < 65536 else 0, 0xF8, spf,
                      HD_SPT, HD_HEADS, HD_SPT, psec if psec >= 65536 else 0)
     struct.pack_into("<BBBI", vol, 36, 0x80, 0, 0x29, int(time.time()) & 0xFFFFFFFF)
-    vol[43:54] = b"GWDOS-HD   "; vol[54:62] = b"FAT12   "
-    vol[62:62 + len(code)] = code[:11] + bytes([0xBE, 0x5A, 0x7C]) + code[14:]
+    vol[43:54] = b"GWDOS-HD   "; vol[54:62] = b"FAT16   " if f16 else b"FAT12   "
+    vol[62:62 + len(code)] = code
     vol[0x5A:0x5A + len(msg)] = msg
     vol[510:512] = b"\x55\xAA"
     for k in range(2):
         o = 512 + k * spf * 512
-        vol[o:o + 3] = bytes([0xF8, 0xFF, 0xFF])
+        vol[o:o + 4 if f16 else o + 3] = bytes([0xF8, 0xFF, 0xFF, 0xFF]) if f16 else bytes([0xF8, 0xFF, 0xFF])
     return disk, vol
 
 def split_volume(img):
     """(offset, volume) for an image: whole image for a floppy, first partition for a hard disk."""
-    if struct.unpack_from("<H", img, 11)[0] == 512 and img[21] in (0xF0, 0xF8, 0xF9, 0xFD, 0xFF):
+    if struct.unpack_from("<H", img, 11)[0] == 512 and img[21] in (0xF0, 0xF8, 0xF9, 0xFD, 0xFF) and img[0] in (0xEB, 0xE9):
         return 0, img
     if img[510:512] != b"\x55\xAA": sys.exit("not a FAT disk image")
     lba, count = struct.unpack_from("<II", img, 0x1BE + 8)
@@ -324,8 +366,8 @@ def folder_bytes(path):
     return t
 
 # ---- ayuda (fat12.py, fat12.py -h, fat12.py help <orden>) ----
-HELP_INTRO = """fat12.py - herramienta para imágenes de disco DOS (FAT12) de gw-dos y TinyEMU
-Disquetes y discos duros pequeños (hasta 16 MB). Solo necesita Python 3.
+HELP_INTRO = """fat12.py - herramienta para imágenes de disco DOS (FAT12/FAT16) de gw-dos y TinyEMU
+Disquetes y discos duros (hasta 500 MB). Solo necesita Python 3.
 
 Uso:  python3 fat12.py <orden> <argumentos...>
       python3 fat12.py help <orden>      ayuda detallada de una orden
@@ -355,9 +397,12 @@ HELP = [
      "Crea un disquete DOS vacío de 1,44 MB (opcionalmente con archivos).",
      ["python3 fat12.py new vacio.img", "python3 fat12.py new juego.img GAME.EXE"]),
     ("newhd", "newhd <img> [--size MB] [archivo|carpeta ...]",
-     "Crea una imagen de disco duro (particionada, FAT12, hasta 16 MB; por\n"
-     "defecto 16). Cada carpeta del PC pasa a ser un subdirectorio (C:\\LOOM).",
-     ["python3 fat12.py newhd c.img --size 8 loom", "python3 fat12.py newhd c.img loom monkey"]),
+     "Crea una imagen de disco duro particionada y formateada (por defecto\n"
+     "16 MB, máximo 500; FAT12 hasta 16 MB, FAT16 por encima). Cada carpeta\n"
+     "del PC pasa a ser un subdirectorio (C:\\LOOM). El disco arranca solo en\n"
+     "cuanto tenga DOS: instálalo arrancando desde un disquete (o usa SYS C:).",
+     ["python3 fat12.py newhd c.img --size 8 loom", "python3 fat12.py newhd c.img loom monkey",
+      "python3 fat12.py newhd dos5.img --size 32"]),
     ("bootdisk", "bootdisk <Disk01.img> <a.img>",
      "A partir del disco 1 de instalación de MS-DOS 6.x crea un disco de\n"
      "arranque que se queda en A:\\> (sin el programa de instalación).",
@@ -397,7 +442,7 @@ def print_help(cmd=None):
         "add": "mete archivos o carpetas del PC en una imagen",
         "put": "reescribe un archivo que ya está en la imagen",
         "new": "crea un disquete vacío de 1,44 MB",
-        "newhd": "crea un disco duro (hasta 16 MB) desde carpetas",
+        "newhd": "crea un disco duro (hasta 500 MB) vacío o desde carpetas",
         "bootdisk": "disco de arranque desde el disco 1 de MS-DOS 6.x",
         "sysdisk": "disquete arrancable con DOS mínimo + tu juego",
         "todsk": "crea un .dsk para TinyEMU (dos386.bin)",
@@ -445,7 +490,7 @@ def run_cmd():
         args = sys.argv[3:]; size = 16
         if args and args[0] == "--size":
             args.pop(0); size = float(args.pop(0))
-        if size > 16: sys.exit("maximum --size is 16 (MB)")
+        if size > HD_MAX_MB: sys.exit("maximum --size is %d (MB)" % HD_MAX_MB)
         if os.path.exists(path): sys.exit(path + " already exists")
         disk, vol = new_hd(size)
         for f in args: add_path(vol, f)
