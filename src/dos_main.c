@@ -187,14 +187,23 @@ static void add_image(const char* name, void* user) {
         strcpy(images[n_images++], name);
     }
 }
+#define EJECT_ENTRY "(sacar el disco de A:)"
 static void open_disk_menu(void) {
     n_images = 0;
+    if (drive_a[0] && drive_a[0] != '-') strcpy(images[n_images++], EJECT_ENTRY);   /* first entry */
     plat_list_dir(dos_dir, add_image, NULL);
     disk_sel = 0;
     ui_mode = 2;
 }
 static void insert_a(const char* name) {
     char path[320];
+    if (!strcmp(name, EJECT_ENTRY)) {
+        /* an empty drive, as when an installer says "remove the disk and press ENTER":
+           the reboot then starts from C: (biosdisk_int19h, static_mem.py) */
+        biosdisk_eject(&machine.CPU, 0);
+        drive_a[0] = 0;
+        return;
+    }
     snprintf(path, sizeof(path), "%s/%s", dos_dir, name);
     if (biosdisk_insert(&machine.CPU, 0, path) == 0) {
         snprintf(drive_a, sizeof(drive_a), "%s", name);
@@ -602,6 +611,103 @@ static int dos_line_cancelled(void) {
     return cpu_read(&machine.CPU, prev + last * 2) == '\\' && (p1 == ':' || p0 == ' ' || p0 == '\\');
 }
 
+#ifdef GWDOS_HOST
+/* Host harness only: GWDOS_FEED=<file> drives a whole session -- an installer, say -- one
+   step per line, each step waiting for the one before:
+     wait <text>     until <text> is on the 80x25 text screen
+     frames <n>      let n frames run
+     type <text>     type the text (ASCII)
+     key <name>      enter esc tab bksp up down left right home end pgup pgdn f1..f10
+     disk <path>     put that image in A: (as the disk menu does)
+     eject           empty A: (the disk menu's first entry)
+     screen          print the text screen
+   Every step is logged with its frame number. */
+static FILE* feed_f;
+static char feed_line[256];
+static int feed_have, feed_frames, feed_tpos;
+static uint32_t feed_frame;
+
+static void feed_screen(void) {
+    printf("---- frame %u\n", (unsigned)feed_frame);
+    for (int r = 0; r < 25; r++) {
+        char l[81];
+        for (int c = 0; c < 80; c++) { uint8_t ch = cpu_read(&machine.CPU, 0xB8000 + (r * 80 + c) * 2); l[c] = ch >= 32 && ch < 127 ? (char)ch : ' '; }
+        int n = 80; while (n > 0 && l[n - 1] == ' ') n--; l[n] = 0;
+        printf("|%s\n", l);
+    }
+    fflush(stdout);
+}
+
+static int feed_onscreen(const char* t) {
+    int n = (int)strlen(t);
+    for (int r = 0; r < 25; r++)
+        for (int c = 0; c + n <= 80; c++) {
+            int k = 0;
+            while (k < n && cpu_read(&machine.CPU, 0xB8000 + (r * 80 + c + k) * 2) == (uint8_t)t[k]) k++;
+            if (k == n) return 1;
+        }
+    return 0;
+}
+
+static uint16_t feed_ascii(char ch) {
+    static const char* rows[4] = { "1234567890-=", "qwertyuiop[]", "asdfghjkl;'`", "\\zxcvbnm,./" };
+    static const char* shifted[4] = { "!@#$%^&*()_+", "QWERTYUIOP{}", "ASDFGHJKL:\"~", "|ZXCVBNM<>?" };
+    static const uint8_t base[4] = { 0x02, 0x10, 0x1E, 0x2B };
+    if (ch == ' ') return 0x3920;
+    for (int r = 0; r < 4; r++) {
+        const char* p = strchr(rows[r], ch); if (p && ch) return (uint16_t)(((base[r] + (p - rows[r])) << 8) | (uint8_t)ch);
+        p = strchr(shifted[r], ch); if (p && ch) return (uint16_t)(((base[r] + (p - shifted[r])) << 8) | (uint8_t)ch);
+    }
+    return (uint8_t)ch;
+}
+
+static void feed_frame_step(void) {
+    static int init;
+    feed_frame++;
+    if (!init) { const char* e = getenv("GWDOS_FEED"); init = 1; if (e) feed_f = fopen(e, "r"); }
+    if (!feed_f) return;
+    for (;;) {
+        if (!feed_have) {
+            if (!fgets(feed_line, sizeof feed_line, feed_f)) { fclose(feed_f); feed_f = 0; printf("[feed] end at frame %u\n", (unsigned)feed_frame); return; }
+            feed_line[strcspn(feed_line, "\r\n")] = 0;
+            if (!feed_line[0] || feed_line[0] == '#') continue;
+            feed_have = 1; feed_frames = -1; feed_tpos = 0;
+        }
+        char* arg = strchr(feed_line, ' '); arg = arg ? arg + 1 : feed_line + strlen(feed_line);
+        if (!strncmp(feed_line, "wait ", 5)) {
+            if (!feed_onscreen(arg)) return;
+        } else if (!strncmp(feed_line, "frames ", 7)) {
+            if (feed_frames < 0) feed_frames = atoi(arg);
+            if (feed_frames-- > 0) return;
+        } else if (!strncmp(feed_line, "type ", 5)) {
+            if (bda16(0x1A) != bda16(0x1C)) return;          /* one key at a time */
+            if (arg[feed_tpos]) { bios_kbd_put(feed_ascii(arg[feed_tpos++])); return; }
+        } else if (!strncmp(feed_line, "key ", 4)) {
+            static const struct { const char* n; uint16_t k; } keys[] = {
+                {"enter",0x1C0D},{"esc",0x011B},{"tab",0x0F09},{"bksp",0x0E08},{"up",0x4800},{"down",0x5000},
+                {"left",0x4B00},{"right",0x4D00},{"home",0x4700},{"end",0x4F00},{"pgup",0x4900},{"pgdn",0x5100},
+                {"f1",0x3B00},{"f2",0x3C00},{"f3",0x3D00},{"f4",0x3E00},{"f5",0x3F00},{"f6",0x4000},{"f7",0x4100},
+                {"f8",0x4200},{"f9",0x4300},{"f10",0x4400} };
+            if (bda16(0x1A) != bda16(0x1C)) return;
+            uint16_t k = 0;
+            for (unsigned i = 0; i < sizeof keys / sizeof keys[0]; i++) if (!strcmp(keys[i].n, arg)) k = keys[i].k;
+            if (!k) { printf("[feed] unknown key %s\n", arg); }
+            else bios_kbd_put(k);
+        } else if (!strncmp(feed_line, "disk ", 5)) {
+            if (biosdisk_insert(&machine.CPU, 0, arg) == 0) snprintf(drive_a, sizeof(drive_a), "%.47s", strrchr(arg, '/') ? strrchr(arg, '/') + 1 : arg);
+            else printf("[feed] cannot open %s\n", arg);
+        } else if (!strcmp(feed_line, "eject")) {
+            insert_a(EJECT_ENTRY);
+        } else if (!strcmp(feed_line, "screen")) {
+            feed_screen();
+        } else printf("[feed] unknown step: %s\n", feed_line);
+        printf("[feed] %6u  %s\n", (unsigned)feed_frame, feed_line); fflush(stdout);
+        feed_have = 0;
+        return;                                           /* one step per frame */
+    }
+}
+#endif
+
 static void autorun_frame(void) {
     if (!run_state) return;
     int prompt = dos_prompt_visible();
@@ -966,6 +1072,9 @@ int dos_main(int start_paused) {
             uint32_t t0 = plat_ms();
             run_frame();
             autorun_frame();
+#ifdef GWDOS_HOST
+            feed_frame_step();
+#endif
             mouse_frame();
             emu_ms += plat_ms() - t0;
         } else {

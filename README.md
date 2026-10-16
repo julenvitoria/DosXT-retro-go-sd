@@ -63,8 +63,25 @@ python3 tools/fat12.py newhd c.img LOOM MONKEY        # cada carpeta pasa a ser 
 python3 tools/fat12.py ls c.img
 ```
 
-Hasta 16 MB. Llámala `c.img` y ponla en `/roms/dos/` junto a los disquetes: al arrancar desde
-cualquier disquete se monta como C:.
+Por defecto 16 MB; con `--size` hasta 500 MB (FAT16 por encima de 16 MB). Llámala `c.img` y
+ponla en `/roms/dos/` junto a los disquetes: al arrancar desde cualquier disquete se monta como C:.
+Lo que DOS escribe en el disco (y en los disquetes) se guarda en la tarjeta.
+
+### Instalar MS-DOS en un disco duro y arrancar desde él
+
+```
+python3 tools/fat12.py newhd c.img --size 32          # disco vacío, formateado y arrancable
+```
+
+1. Copia `c.img` y los discos de instalación (`Disk01.img`, `Disk02.img`...) a `/roms/dos/`.
+2. Arranca `Disk01.img` desde el menú: el instalador ve `c.img` como C: y propone `C:\DOS`.
+3. Cuando pida otro disco, abre el menú de discos y elige `Disk02.img` (luego `Disk03.img`).
+4. Al terminar ("retire el disquete y presione ENTRAR"): en el menú de discos elige
+   **(sacar el disco de A:)** y pulsa ENTRAR; sin disquete, el PC arranca desde C:.
+5. A partir de ahí arranca `c.img` desde el menú y sale tu DOS instalado.
+
+Probado con MS-DOS 5.0 en español (INSTALAR). Consejo: en "Ejecutar Shell al inicio" elige NO;
+el MS-DOS Shell es lento en un 8088 y en 80 columnas no cabe entero en la pantalla.
 
 ### Meter juegos y programas (.exe, .com)
 
