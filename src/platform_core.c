@@ -68,6 +68,19 @@ size_t plat_mem_region(int index, uint8_t** base) {
         *base = p;
         return p ? n : 0;
     }
+    /* The firmware's DTCM and ITCM bump pools are this core's too and were unused. Guest
+       RAM goes in 16 KB chunks, so every whole chunk found here is 16 KB more DOS memory
+       (the AdLib synthesiser's ~25 KB came out of RAM_EMU). A margin stays behind in each:
+       DTCM's pool runs up to the stack's red zone. */
+    if (index == 2 || index == 3) {
+        const size_t margin = index == 2 ? 8 * 1024 : 4 * 1024;
+        size_t free = index == 2 ? dtc_get_free_size() : itc_get_free_size();
+        if (free < margin + 16 * 1024) return 0;
+        size_t n = (free - margin) & ~(size_t)(16 * 1024 - 1);    /* whole chunks only */
+        void* p = index == 2 ? dtc_malloc(n) : itc_malloc(n);
+        *base = (uint8_t*)p;
+        return p ? n : 0;
+    }
     return 0;
 }
 

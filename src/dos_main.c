@@ -442,6 +442,10 @@ void spk_hle_frame_begin(const uint64_t* exec, uint32_t instructions, uint32_t i
 void spk_hle_chunk(uint32_t done, uint32_t len);
 void spk_hle_frame_end(void);
 #endif
+#ifdef XT_ADLIB_HLE
+void adlib_hle_init(const uint64_t* exec, const uint32_t* ips);
+void adlib_hle_render_mix(int16_t* dst, unsigned n, unsigned rate);
+#endif
 
 static void run_frame(void) {
     /* exactly ips/60 instructions per frame on average: the remainder carries over and the
@@ -481,6 +485,9 @@ static void run_frame(void) {
 #ifdef XT_SPK_HLE
     spk_hle_frame_end();
     (void)si;
+#ifdef XT_ADLIB_HLE
+    adlib_hle_render_mix(audio, PLAT_AUDIO_SAMPLES, PLAT_AUDIO_RATE);   /* AdLib music on top */
+#endif
 #else
     int16_t last = si ? audio[si - 1] : 0;
     while (si < PLAT_AUDIO_SAMPLES) audio[si++] = last;
@@ -829,11 +836,10 @@ int dos_main(int start_paused) {
     info_until = plat_ms() + INFO_MS;
     cga_zoom80 = plat_setting_get("Zoom80", 1) ? 1 : 0;
 
-    for (int i = 0; ; i++) {
+    for (int i = 0; i < 4; i++) {                 /* RAM_EMU, LCD spare, DTCM, ITCM */
         uint8_t* base;
         size_t size = plat_mem_region(i, &base);
-        if (!size) break;
-        xt_pool_add(base, size);
+        if (size) xt_pool_add(base, size);
     }
 
     timing_virtual_enable = 1;
@@ -855,6 +861,9 @@ int dos_main(int start_paused) {
 #ifdef XT_CGA_STATUS_ICOUNT
     cga_status_icount = &machine.CPU.totalexec;    /* 3DAh retrace bits follow the emulated CPU */
     cga_status_ips = &ips;
+#endif
+#ifdef XT_ADLIB_HLE
+    if (ok) adlib_hle_init(&machine.CPU.totalexec, &ips);
 #endif
 
     if (ok) insert_boot_disks();

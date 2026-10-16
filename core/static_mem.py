@@ -342,4 +342,9 @@ c = rd("modules/audio/pcspeaker.c")
 c = sub(c, "\ttiming_addTimer(pcspeaker_callback, spk, SAMPLE_RATE, TIMING_ENABLED);",
            "#ifndef XT_SPK_HLE\n\ttiming_addTimer(pcspeaker_callback, spk, SAMPLE_RATE, TIMING_ENABLED);\n#endif")
 wr("modules/audio/pcspeaker.c", c)
+# XT_ADLIB_HLE: AdLib (OPL2) on emu8950, ports 388h/389h (adlib_hle.c)
+shutil.copy(os.path.join(here, "files", "adlib_hle.c"), os.path.join(d, "adlib_hle.c"))
+os.makedirs(os.path.join(d, "emu8950"), exist_ok=True)
+for f in ("emu8950.c", "emu8950.h", "slot_render.h"):
+    shutil.copy(os.path.join(here, "files", "emu8950", f), os.path.join(d, "emu8950", f))
 print("phase 3 static-memory patches applied")
