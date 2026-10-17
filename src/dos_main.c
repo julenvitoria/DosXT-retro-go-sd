@@ -157,26 +157,23 @@ static void osk_press(uint8_t sc) {
         osd_frames = 2 * PLAT_FPS;
         return;
     }
-    if (sc == 0x2A) {                     /* Shift: off -> next key (green) -> locked (red) -> off */
-        latched_shift = (uint8_t)((latched_shift + 1) % 3);
-        if (latched_shift == 1) key_push(0x2A);
-        else if (latched_shift == 0) key_push(0x2A | 0x80);
-        return;
-    }
-    uint8_t* latch = sc == 0x1D ? &latched_ctrl : sc == 0x38 ? &latched_alt : NULL;
-    if (latch) {
-        *latch ^= 1;
-        key_push(*latch ? sc : (sc | 0x80));
-        return;
-    }
-    if (sc == SC_COLON) {                 /* to change drive (A:, C:) without the Shift latch */
-        if (!latched_shift) key_push(0x2A);
-        key_tap(0x27);
-        if (!latched_shift) key_push(0x2A | 0x80);
-    } else key_tap(sc);
-    if (latched_shift == 1) { key_push(0x2A | 0x80); latched_shift = 0; }   /* 2 = locked: stays down */
-    if (latched_ctrl)  { key_push(0x1D | 0x80); latched_ctrl = 0; }
-    if (latched_alt)   { key_push(0x38 | 0x80); latched_alt = 0; }
+    /* The latches are STATE ONLY: no make code goes out when Shift/Ctrl/Alt is
+       latched, the modifier is wrapped round the next on-screen key instead.
+       Holding the make while the keyboard was closed turned the d-pad's arrows
+       into 8/2/4/6 (Shift + keypad) at the DOS prompt. */
+    if (sc == 0x2A) { latched_shift = (uint8_t)((latched_shift + 1) % 3); return; }  /* off -> next key -> locked -> off */
+    if (sc == 0x1D) { latched_ctrl ^= 1; return; }
+    if (sc == 0x38) { latched_alt ^= 1; return; }
+    int shift = latched_shift || sc == SC_COLON;   /* ":" in one key: Shift + ";" */
+    if (latched_ctrl) key_push(0x1D);
+    if (latched_alt)  key_push(0x38);
+    if (shift)        key_push(0x2A);
+    key_tap(sc == SC_COLON ? 0x27 : sc);
+    if (shift)        key_push(0x2A | 0x80);
+    if (latched_alt)  key_push(0x38 | 0x80);
+    if (latched_ctrl) key_push(0x1D | 0x80);
+    if (latched_shift == 1) latched_shift = 0;      /* 2 = locked: stays on for the next keys */
+    latched_ctrl = latched_alt = 0;
 }
 
 /* ---- disk menu ---- */
@@ -763,6 +760,10 @@ static void feed_frame_step(void) {
                     if (!strcmp(osk_rows[r][c].label, arg)) { osk_press(osk_rows[r][c].sc); hit = 1; }
             if (!hit) printf("[feed] no OSK key %s\n", arg);
             else printf("[feed] shift latch %d\n", latched_shift);
+        } else if (!strncmp(feed_line, "pad ", 4)) {      /* tap a pad button by index (0 up,1 down,2 left,3 right..) */
+            int i = atoi(arg);
+            if (i >= 0 && i < GC_BUTTONS) { pad_key(i, 1); pad_key(i, 0); }
+            printf("[feed] kbd flags 0417=%02X\n", cpu_read(&machine.CPU, 0x417));
         } else if (!strcmp(feed_line, "eject")) {
             insert_a(EJECT_ENTRY);
         } else if (!strcmp(feed_line, "screen")) {
