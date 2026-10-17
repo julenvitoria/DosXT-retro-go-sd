@@ -99,38 +99,23 @@ Al salir del programa, el DOS puede pedir el disco con `COMMAND.COM`: vuelve a p
 
 ## Configuración por juego (`.cfg`)
 
-Para cada imagen `/roms/dos/JUEGO.img` se busca `/cores/dos/JUEGO.cfg`, junto al core, para que
-no salga en el menú de juegos (si no existe, también `/roms/dos/cfg/JUEGO.cfg` y `/roms/dos/JUEGO.cfg`). Así el juego puede ser un disquete de datos normal (`fat12.py new`) y el
-DOS arranca desde tu disquete de arranque. Ejemplos en `examples/cfg/` (`plantilla.cfg` tiene todos los botones):
+Cada juego puede llevar un `.cfg` con su mismo nombre (`/cores/dos/JUEGO.cfg`, junto al core, para
+que no salga en el menú). Así el juego puede ser un disquete de datos normal (`fat12.py new`) y el DOS
+arranca desde tu disquete de arranque. Un ejemplo:
 
 ```ini
-; comentarios con ; o #
-boot   = !BOOT.img     ; arranca el DOS desde esta imagen (A:); el juego queda en B: (disquete)
-                           ; o C: (disco duro). Se busca en /cores/dos y luego en /roms/dos.
-                           ; Si es un disco duro (boot = c.img, con DOS instalado) arranca desde
-                           ; C: y el juego queda en A: (disquete) o D: (disco duro): run = a:;juego
-run    = b:;prince         ; se escribe en el prompt del DOS; ";" = Intro entre órdenes
-cpu    = 10                ; MHz: 4.77, 8, 10, 12, 16, 20
-zoom80 = 0                 ; texto de 80 columnas: 1 = ventana de 40, 0 = línea entera
-video  = vga               ; vga (EGA/VGA, por defecto) o cga (solo CGA, 640 KB para el DOS)
-vram   = 128               ; memoria EGA/VGA en KB: 64, 128 (por defecto) o 256
-mouse  = on                ; ratón: cruceta = puntero, A/B = botones (ver "Ratón")
-up     = q                 ; cruceta: up down left right (por defecto, las flechas)
-down   = a
-left   = o
-right  = p
-a      = shift             ; botones: a b game time start select
-b      = ctrl+a            ;   (también arriba, abajo, izquierda, derecha)
-time   = keyboard          ; teclado en pantalla ("teclado"); "none"/"nada" = sin función
+boot   = !BOOT.img     ; arranca el DOS desde esta imagen; el juego queda en B: (o C: si es disco duro)
+run    = b:;prince     ; se escribe en el prompt del DOS; ";" = Intro entre órdenes
+cpu    = 10            ; MHz
+a      = shift         ; qué tecla del PC manda cada botón
 ```
 
-- `#` y `;` empiezan un comentario en cualquier sitio de la línea, así que no los uses en nombres de fichero (`!BOOT.img` sí vale).
-- **Teclas**: la lista de nombres que se pueden poner en cada botón (y cómo saber qué teclas usa un juego) está en [`docs/teclas.md`](docs/teclas.md).
-- **`run`** escribe directamente en el búfer de teclado de la BIOS (da igual el `KEYB` cargado) y
-  espera a ver el prompt (`A:\>`) antes de cada orden. El disquete de `boot` debe acabar en el prompt
-  (el de `fat12.py bootdisk` lo hace).
-- Si ningún botón queda como `keyboard`, TIME sigue abriendo el teclado en pantalla.
-- La franja de arriba muestra el `.cfg` cargado; si alguna línea no se entiende indica cuántas ("N errores").
+- **Todas las opciones** (`boot`, `run`, `cpu`, `video`, `vram`, `zoom80`, `mouse` y los botones), las
+  opciones de sonido de los propios juegos (por ejemplo `monkey a` para AdLib) y qué tarjetas emula:
+  [`docs/cfg.md`](docs/cfg.md).
+- **Nombres de teclas** para los botones, y cómo saber qué teclas usa un juego:
+  [`docs/teclas.md`](docs/teclas.md).
+- Ejemplos listos en [`examples/cfg/`](examples/cfg/) (`plantilla.cfg` tiene todos los botones).
 
 ## EGA y VGA
 
