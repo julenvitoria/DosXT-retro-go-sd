@@ -1,5 +1,7 @@
 # gw-dos: MS-DOS (PC XT + CGA/EGA/VGA) como core externo para la Game & Watch (retro-go SD)
 
+*[Read in English](README.en.md)*
+
 Un PC XT emulado (CPU 8088/V20 de XTulator, BIOS libre de Sergey Kiselev, tarjeta CGA con
 gráficos EGA/VGA y ratón) empaquetado como **core externo** del firmware retro-go SD, rama **`external_cores`**
 (ABI de firmware v2, formato `CORE`). Aparece en el menú como sistema **MS-DOS** y las

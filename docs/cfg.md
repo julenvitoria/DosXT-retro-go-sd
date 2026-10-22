@@ -1,5 +1,7 @@
 # El `.cfg` de cada juego
 
+*[Read in English](cfg.en.md)*
+
 *Todo lo que se puede poner en el `.cfg` de un juego para `dos.bin`. Vuelve al
 [README](../README.md#configuración-por-juego-cfg).*
 

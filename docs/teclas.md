@@ -1,5 +1,7 @@
 # Teclas para los botones del `.cfg`
 
+*[Read in English](teclas.en.md)*
+
 *Parte de la [configuración por juego](../README.md#configuración-por-juego-cfg).*
 
 Lo que va detrás del `=` de un botón (`a = shift`) es el nombre de una tecla del PC. Da igual
