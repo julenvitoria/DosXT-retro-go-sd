@@ -134,9 +134,9 @@ and CGA modes are the usual ones.
 | "mode X" | 320×200/240, unchained 256 colours | 256 KB |
 | 10h / 12h | 640×350 / 640×480, 16 colours (shown scaled down) | 128 KB / 256 KB |
 
-Video memory comes out of DOS RAM: `vram = 64` leaves 624 KB, **128 (default)** 560 KB and 256
-leaves 432 KB. `video = cga` removes EGA/VGA and leaves the full 640 KB (for games that need all
-the memory). If a game uses more video memory than there is, the bottom strip says so in red
+Video memory comes out of the same pool as DOS RAM: with `vram = 64` and with **128 (default)** DOS
+keeps its full 640 KB, and 256 leaves 512 KB. `video = cga` removes EGA/VGA (for games that only
+work on CGA). If a game uses more video memory than there is, the bottom strip says so in red
 ("Falta memoria de video"): raise `vram` in its cfg. While an EGA/VGA mode is up, the bottom strip
 shows which and with how much memory ("EGA 128K", "VGA 128K").
 
@@ -213,10 +213,10 @@ host/                "fake firmware" to test everything on the PC
 core/                patches to the XTulator core (no malloc, paged tables, timers, INT 13h...)
 ```
 
-Memory: the core takes ≈ 120 KB of code + 37 KB of BSS in RAM_EMU. That leaves ≈ 551 KB of RAM_EMU
-(with 16 KB reserved for the firmware), and LUT8 mode frees ≈ 150 KB more from the LCD. EGA/VGA video
-memory comes out of that first (128 KB by default) and the rest is DOS RAM, in 16 KB blocks: 560 KB
-by default, 640 KB with `video = cga`.
+Memory: the core takes ≈ 127 KB of code + 57 KB of BSS in RAM_EMU. That leaves ≈ 524 KB of RAM_EMU
+(with 16 KB reserved for the firmware), LUT8 mode frees ≈ 148 KB more from the LCD and DTCM adds
+96 KB: 768 KB in all. EGA/VGA video memory comes out of that first (128 KB by default) and the rest
+is DOS RAM, in 4 KB blocks so the tail of each region is used too: the full 640 KB by default.
 
 Time: the emulated PC's clock is **virtual** (it advances with the instructions executed), so the
 PIT, DOS's IRQ0 and the sound run at the same speed as the emulated CPU whatever the load. That is

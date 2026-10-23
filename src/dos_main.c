@@ -972,13 +972,15 @@ static void update_palette(int force) {
 #ifdef XT_VGA_HLE
     int kind = !vga_active ? 0 : (vga_hle_is256() ? 2 : 1);
     if (!force && kind == clut_kind && !(kind && vga_pal_dirty)) return;
-    static uint32_t clut[256], last[256];
+    /* clut keeps what was last pushed, so it is also the "unchanged?" reference (a
+       separate copy cost 1 KB of RAM_EMU, i.e. a 4 KB chunk of DOS memory) */
+    static uint32_t clut[256];
     static int last_n = 0;
     if (kind && !force && kind == clut_kind) {         /* games often rewrite an unchanged palette */
         int n = kind == 1 ? 16 : 256;
         uint32_t tmp[256];
         if (kind == 1) vga_hle_palette16(tmp); else vga_hle_palette256(tmp);
-        if (memcmp(tmp, last + (kind == 1 ? 16 : 0), n * sizeof(uint32_t)) == 0 && last_n == (kind == 1 ? 32 : 256)) return;
+        if (memcmp(tmp, clut + (kind == 1 ? 16 : 0), n * sizeof(uint32_t)) == 0 && last_n == (kind == 1 ? 32 : 256)) return;
     }
     clut_kind = kind;
     for (int i = 0; i < 16; i++) ui_cmap[i] = (uint8_t)i;
@@ -987,7 +989,7 @@ static void update_palette(int force) {
         memcpy(clut, cga_rgb, sizeof(cga_rgb));
         vga_hle_palette16(clut + 16);
         plat_set_palette(clut, 32);
-        memcpy(last, clut, 32 * sizeof(uint32_t)); last_n = 32;
+        last_n = 32;
         return;
     }
     vga_hle_palette256(clut);
@@ -1002,7 +1004,7 @@ static void update_palette(int force) {
         ui_cmap[i] = (uint8_t)best;
     }
     plat_set_palette(clut, 256);
-    memcpy(last, clut, sizeof(clut)); last_n = 256;
+    last_n = 256;
 #else
     if (force || clut_kind != 0) { clut_kind = 0; plat_set_palette(cga_rgb, 16); }
 #endif
