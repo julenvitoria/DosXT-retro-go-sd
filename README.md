@@ -2,7 +2,7 @@
 
 *[Read in English](README.en.md)*
 
-Para juegos que piden un 286/386 (VGA, memoria extendida, protegido) está el otro core,
+Para juegos que piden un 286/386 (VGA, memoria extendida, modo protegido) está el otro core,
 [dos386-retro-go-sd](https://github.com/julenvitoria/dos386-retro-go-sd) (`dos386.bin`). Los dos
 conviven en la misma tarjeta.
 
