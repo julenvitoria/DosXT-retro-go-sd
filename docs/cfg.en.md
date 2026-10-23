@@ -19,9 +19,10 @@ floppy, with the default buttons.
 ## Format
 
 - One option per line: `key = value`. Upper or lower case, it does not matter.
-- `;` and `#` start a comment anywhere on the line (except a `;` inside the value
-  of `run`, which separates commands). That is why a keyboard `;` is written
-  `semicolon`.
+- `;` and `#` start a comment anywhere on the line. In `run` a `;` with no
+  space before it separates commands (`b:;game`) and a `;` after a space starts
+  the comment (`run = b:;game   ; comment`). That is why a keyboard `;` is
+  written `semicolon`.
 - If a line is not understood, the top strip says so when loading
   ("N errores") and that option stays as it was.
 
