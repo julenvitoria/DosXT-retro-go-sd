@@ -133,9 +133,9 @@ Rick Dangerous EGA). Los modos de texto y CGA siguen siendo los de siempre.
 | "modo X" | 320×200/240, 256 colores sin encadenar | 256 KB |
 | 10h / 12h | 640×350 / 640×480, 16 colores (se ven reducidos) | 128 KB / 256 KB |
 
-La memoria de vídeo se resta de la RAM del DOS: con `vram = 64` quedan 624 KB, con **128 (por
-defecto)** 560 KB y con 256 quedan 432 KB. `video = cga` quita la EGA/VGA y deja los 640 KB enteros
-(para juegos que necesitan toda la memoria). Si un juego usa más memoria de vídeo de la que hay, la
+La memoria de vídeo sale de la misma reserva que la RAM del DOS: con `vram = 64` y con **128 (por
+defecto)** el DOS tiene sus 640 KB enteros, y con 256 quedan 512 KB. `video = cga` quita la EGA/VGA
+(para juegos que solo funcionan en CGA). Si un juego usa más memoria de vídeo de la que hay, la
 franja inferior lo avisa en rojo ("Falta memoria de video"): sube `vram` en su cfg. Mientras hay un
 modo EGA/VGA, la franja inferior indica cuál y con cuánta memoria ("EGA 128K", "VGA 128K").
 
@@ -206,10 +206,10 @@ host/                "falso firmware" para probar todo en el PC
 core/                parches del núcleo XTulator (sin malloc, tablas por páginas, timers, INT 13h...)
 ```
 
-Memoria: el core ocupa ≈ 120 KB de código + 37 KB de BSS en RAM_EMU. Quedan ≈ 551 KB de RAM_EMU (con
-16 KB de reserva para el firmware) y el modo LUT8 libera ≈ 150 KB más del LCD. De ahí sale primero la
-memoria de vídeo EGA/VGA (128 KB por defecto) y el resto es la RAM del DOS, en bloques de 16 KB:
-560 KB por defecto, 640 KB con `video = cga`.
+Memoria: el core ocupa ≈ 127 KB de código + 57 KB de BSS en RAM_EMU. Quedan ≈ 524 KB de RAM_EMU (con
+16 KB de reserva para el firmware), el modo LUT8 libera ≈ 148 KB más del LCD y la DTCM aporta 96 KB:
+768 KB en total. De ahí sale primero la memoria de vídeo EGA/VGA (128 KB por defecto) y el resto es la
+RAM del DOS, en bloques de 4 KB para aprovechar los restos de cada zona: 640 KB enteros por defecto.
 
 Tiempo: el reloj del PC emulado es **virtual** (avanza con las instrucciones ejecutadas), así que
 el PIT, la IRQ0 del DOS y el sonido van a la misma velocidad que la CPU emulada, sea cual sea la
