@@ -2,6 +2,10 @@
 
 *[Leer en español](README.md)*
 
+For games that want a 286/386 (VGA, extended memory, protected mode) there is the other core,
+[dos386-retro-go-sd](https://github.com/julenvitoria/dos386-retro-go-sd) (`dos386.bin`). Both live
+on the same card.
+
 An emulated PC XT (XTulator's 8088/V20 CPU, Sergey Kiselev's free BIOS, a CGA card with
 EGA/VGA graphics, and a mouse) packaged as an **external core** for the retro-go SD firmware,
 branch **`external_cores`** (firmware ABI v2, `CORE` format). It shows up in the menu as the
