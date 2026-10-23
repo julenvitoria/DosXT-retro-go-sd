@@ -101,9 +101,19 @@ static void opl_write_reg(uint8_t reg, uint8_t val) {
 	render_to_now();          /* the chip plays its old state up to this instruction */
 	if (reg == 0xBD) {
 		uint8_t want = (val >> 5) & 1;
-		if (want && !rhythm_on) adlib_hle_rhythm++;
+		if (want && !rhythm_on) {
+			adlib_hle_rhythm++;
+			for (int c = 6; c < 9; c++)                     /* the drum channels go quiet */
+				OPL_writeReg(opl, 0xB0 + c, opl->reg[0xB0 + c] & 0xDF);
+		}
 		rhythm_on = want;
+		/* emu8950 is built with EMU8950_NO_PERCUSSION_MODE and that build ASSERTS bit 5
+		   is clear: Ironman with AdLib died on "FATAL EXCEPTION: Assert". Only the
+		   AM/vibrato depth bits go through. */
+		val &= 0xC0;
 	}
+	if (rhythm_on && reg >= 0xB6 && reg <= 0xB8)         /* drums: never key them on as notes */
+		val &= 0xDF;
 	if ((reg & 0xF0) == 0xB0 && (reg & 0x0F) < 9) {
 		uint8_t was = (opl->reg[reg] >> 5) & 1;
 		if (((val >> 5) & 1) && !was) adlib_hle_keyons++;
