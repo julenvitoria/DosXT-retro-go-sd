@@ -118,7 +118,12 @@ int gamecfg_load(const char* path, GAMECFG* cfg) {
                 trim(key); trim(val);
                 for (char* p = key; *p; p++) *p = lower(*p);
                 if (!strcmp(key, "run")) {
-                    /* a trailing "  ; comment" after the commands is not supported: keep it simple */
+                    /* commands are separated by a bare ";" ("b:;cd \\game;game"); a ";" after a
+                       space starts a comment, as on every other line. Without this the comment
+                       became one more command, the autotyper waited for its prompt for ever and
+                       the pad stayed held back (Ironman's example cfg). */
+                    for (char* p = val + 1; *p; p++)
+                        if (*p == ';' && (p[-1] == ' ' || p[-1] == '\t')) { *p = 0; trim(val); break; }
                     snprintf(cfg->run, sizeof(cfg->run), "%s", val);
                 } else {
                     char* sc2 = strchr(val, ';');

@@ -396,6 +396,9 @@ wr("machine.c", m)
 shutil.copy(os.path.join(here, "files", "spk_hle.c"), os.path.join(d, "spk_hle.c"))
 c = rd("chipset/i8255.c")
 c = sub(c, "\tcase 1:\n\t\tif (value & 0x01) {", "\tcase 1:\n#ifdef XT_SPK_HLE\n\t\t{ void spk_hle_port61(uint8_t v); spk_hle_port61(value); }\n#endif\n\t\tif (value & 0x01) {")
+# Port 60h read = the code is consumed: key_pump() loads the next one only after it (dos_main.c).
+c = sub(c, "\tcase 0:\n\t\treturn i8255->keystate->scancode;",
+           "\tcase 0:\n\t\ti8255->keystate->isNew = 0;\n\t\treturn i8255->keystate->scancode;")
 wr("chipset/i8255.c", c)
 c = rd("chipset/i8253.c")
 c = sub(c, "\t\tif (loaded) switch (i8253->mode[portnum]) {",

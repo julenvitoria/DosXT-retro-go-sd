@@ -19,8 +19,9 @@ arranque, con los botones por defecto.
 ## Formato
 
 - Una opción por línea: `clave = valor`. Mayúsculas o minúsculas, da igual.
-- `;` y `#` empiezan un comentario en cualquier sitio de la línea (salvo el `;`
-  dentro del valor de `run`, que separa órdenes). Por eso un `;` de teclado se
+- `;` y `#` empiezan un comentario en cualquier sitio de la línea. En `run` el
+  `;` pegado separa órdenes (`b:;juego`) y un `;` después de un espacio empieza
+  el comentario (`run = b:;juego   ; comentario`). Por eso un `;` de teclado se
   escribe `semicolon`.
 - Si una línea no se entiende, la franja de arriba lo avisa al cargar
   ("N errores") y esa opción se queda como estaba.

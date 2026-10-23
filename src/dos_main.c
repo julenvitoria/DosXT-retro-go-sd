@@ -89,6 +89,12 @@ static uint8_t kq[KQ_SIZE];
 static int kq_head = 0, kq_tail = 0;
 static uint32_t kq_gap = 0;               /* instructions since the last scancode */
 #define KQ_SPACING 4000                   /* give the BIOS ISR time to read port 60h */
+/* ...and never load a code over one the guest has not read yet. A game with its own fast
+   timer (Ironman runs IRQ 0 at ~1.6 kHz) keeps IRQ 1 waiting behind it; overwriting the
+   unread make with its break lost the press, and losing the break left the key held --
+   "press many times, then it sticks". Port 60h reads clear isNew (i8255.c). A guest that
+   never reads it gets the next code anyway after KQ_WAIT_MAX. */
+#define KQ_WAIT_MAX 200000
 
 static void key_push(uint8_t sc) {
     int n = (kq_head + 1) % KQ_SIZE;
@@ -96,7 +102,8 @@ static void key_push(uint8_t sc) {
 }
 static void key_pump(uint32_t executed) {
     kq_gap += executed;
-    if (kq_tail != kq_head && kq_gap >= KQ_SPACING) {
+    if (kq_tail != kq_head && kq_gap >= KQ_SPACING
+        && (!machine.KeyState.isNew || kq_gap >= KQ_WAIT_MAX)) {
         machine.KeyState.scancode = kq[kq_tail];
         machine.KeyState.isNew = 1;
         i8259_doirq(&machine.i8259, 1);
@@ -623,6 +630,7 @@ static const char* run_ptr = NULL;
 /* run_state: 0 idle, 1 wait prompt, 2 typing, 3 wait next prompt (declared above) */
 static int prompt_frames = 0;
 static uint16_t run_cursor = 0;
+static uint16_t run_wait_frames = 0;
 
 static uint8_t bda8(uint32_t o) { return cpu_read(&machine.CPU, 0x400 + o); }
 static uint16_t bda16(uint32_t o) { return (uint16_t)(bda8(o) | (bda8(o + 1) << 8)); }
@@ -785,6 +793,12 @@ static void autorun_frame(void) {
         if (++prompt_frames >= 20) { bios_kbd_put(0x1C0D); prompt_frames = 0; }
         return;
     }
+    if (run_state == 3 && !prompt) {
+        /* A program is running and no prompt has come back for ~10 s: the commands are
+           done as far as the user can tell (e.g. a "; comment" after the last one became a
+           command of its own). Stop waiting, or the pad stays held back for good. */
+        if (++run_wait_frames >= 600) { run_state = 0; run_wait_frames = 0; }
+    } else run_wait_frames = 0;
     if (run_state == 1 || run_state == 3) {
         uint16_t cur = bda16(0x50);
         if (prompt && (run_state == 1 || cur != run_cursor)) prompt_frames++;
