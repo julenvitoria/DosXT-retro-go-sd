@@ -40,7 +40,10 @@ static void render_text(uint8_t* fb, int y0, int cols) {
     const uint8_t cstart = cga_datareg[0x0A] & 0x1F, cend = cga_datareg[0x0B] & 0x1F;
     const int cursor_on = ((cga_datareg[0x0A] & 0x60) != 0x20) && cga_cursor_blink_state;
     int cw = (cols == 80) ? 4 : 8, c0 = 0, c1 = cols;
-    if (cols == 80 && cga_zoom80) {          /* 40 columns at full width, following the cursor */
+    extern uint8_t biosdisk_booted;          /* INT 19h: the BIOS POST is over */
+    /* 40 columns at full width, following the cursor -- but not on the BIOS POST screen:
+       its lines are wider than 40 and nobody is typing there, so it is shown whole. */
+    if (cols == 80 && cga_zoom80 && biosdisk_booted) {
         int cc = (int)(cursor % 80);
         if (cc < win80) win80 = cc - 4;
         if (cc >= win80 + 40) win80 = cc - 35;

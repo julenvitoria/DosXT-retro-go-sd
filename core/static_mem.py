@@ -293,6 +293,10 @@ b = sub(b, """	fseek(biosdisk[drivenum].diskfile, fileoffset, SEEK_SET);
 		if (fread(""")
 b = sub(b, """	fseek(biosdisk[drivenum].diskfile, 0L, SEEK_CUR);""", """	fseek(biosdisk[drivenum].diskfile, 0L, SEEK_CUR);
 	biosdisk_ops++;""")
+# INT 19h ends the BIOS POST: the frontend shows the POST screen whole (80 columns) until
+# then, and only afterwards the 40-column zoom window (cga_render.c).
+b = sub(b, "void biosdisk_int19h(CPU_t* cpu, uint8_t intnum) {\n\tif (intnum != 0x19) return;",
+           "uint8_t biosdisk_booted;\nvoid biosdisk_int19h(CPU_t* cpu, uint8_t intnum) {\n\tif (intnum != 0x19) return;\n\tbiosdisk_booted = 1;")
 wr("modules/disk/biosdisk.c", b)
 
 # cpu.c: int_callback assignment has a mismatched pointer type (error on GCC >= 14)
