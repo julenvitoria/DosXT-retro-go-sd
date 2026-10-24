@@ -107,11 +107,12 @@ Al salir del programa, el DOS puede pedir el disco con `COMMAND.COM`: vuelve a p
 
 Cada juego puede llevar un `.cfg` con su mismo nombre (`/cores/dos/JUEGO.cfg`, junto al core, para
 que no salga en el menú). Así el juego puede ser un disquete de datos normal (`fat12.py new`) y el DOS
-arranca desde tu disquete de arranque. Un ejemplo:
+arranca desde tu imagen de arranque (un disco duro con DOS o un disquete). Un ejemplo:
 
 ```ini
-boot   = !BOOT.img     ; arranca el DOS desde esta imagen; el juego queda en B: (o C: si es disco duro)
-run    = b:;prince     ; se escribe en el prompt del DOS; ";" = Intro entre órdenes
+boot   = !BOOT.img     ; disco duro con DOS (arranca en C:): el juego queda en A: (o D: si es disco duro)
+                       ; (con un disquete de arranque, el juego queda en B:, o C: si es disco duro)
+run    = a:;prince     ; se escribe en el prompt del DOS; ";" pegado = Intro entre órdenes
 cpu    = 10            ; MHz
 a      = shift         ; qué tecla del PC manda cada botón
 ```

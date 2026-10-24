@@ -108,11 +108,12 @@ exits, DOS may ask for the disk with `COMMAND.COM`: put the boot floppy back.
 
 Each game can have a `.cfg` with the same name (`/cores/dos/GAME.cfg`, next to the core, so it does
 not show up in the menu). The game can then be a plain data floppy (`fat12.py new`) while DOS boots
-from your boot floppy. An example:
+from your boot image (a hard disk with DOS, or a floppy). An example:
 
 ```ini
-boot   = !BOOT.img     ; boot DOS from this image; the game is on B: (or C: for a hard disk)
-run    = b:;prince     ; typed at the DOS prompt; ";" = Enter between commands
+boot   = !BOOT.img     ; hard disk with DOS (boots on C:): the game is on A: (or D: for a hard disk)
+                       ; (with a boot floppy instead, the game is on B:, or C: for a hard disk)
+run    = a:;prince     ; typed at the DOS prompt; a bare ";" = Enter between commands
 cpu    = 10            ; MHz
 a      = shift         ; which PC key each button sends
 ```
