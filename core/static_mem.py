@@ -385,6 +385,57 @@ m = sub(m, """					debug_log(DEBUG_ERROR, "[MACHINE] ERROR: out of pool memory f
 #endif
 					return -1;""")
 wr("machine.c", m)
+# The PIC delivered an IRQ whatever was IN SERVICE: XTulator's i8259 set ISR bits but never
+# consulted them, so IRQ 0 re-entered its own handler before the EOI. Real 8259 (fully nested
+# mode): a request is delivered only if it outranks every in-service level. Rick Dangerous II
+# on AdLib needs it: its INT 08h handler calls SOUND.COM's INT 65h, which STIs on a fixed
+# private stack; the second tick re-entered INT 65h, rebuilt that stack over the first call's
+# frames and returned into garbage (hang at the title picture). Also: a pending request
+# survives the EOI (it is delivered after, not dropped), a non-specific EOI clears only the
+# highest-priority level, the specific EOI takes all 3 level bits, and auto-EOI (ICW4 bit 1)
+# leaves ISR alone.
+c = rd("chipset/i8259.c")
+c = sub(c, """			case 0x60: //specific EOI
+				i8259->irr &= ~(1 << (value & 0x03));
+				i8259->isr &= ~(1 << (value & 0x03));""", """			case 0x60: //specific EOI
+				i8259->isr &= ~(1 << (value & 0x07));""")
+c = sub(c, """			case 0x20: //non-specific EOI
+				i8259->irr &= ~i8259->isr;
+				i8259->isr = 0x00;""", """			case 0x20: //non-specific EOI: the highest-priority level in service
+				i8259->isr &= (uint8_t)(i8259->isr - 1);""")
+c = sub(c, """uint8_t i8259_nextintr(I8259_t* i8259) {
+	uint8_t i, tmpirr;
+	tmpirr = i8259->irr & (~i8259->imr); //AND request register with inverted mask register
+	for (i = 0; i < 8; i++)
+		if ((tmpirr >> i) & 1) {
+			i8259->irr &= ~(1 << i);
+			i8259->isr |= (1 << i);
+			return(i8259->icw[2] + i);
+		}
+	return 0;
+}""", """/* The level to deliver now, as a one-bit mask, or 0: the highest-priority unmasked request,
+   provided no level of equal or higher priority is in service (fully nested mode). */
+unsigned i8259_deliverable(I8259_t* i8259) {
+	unsigned req = i8259->irr & ~i8259->imr, low = req & -req;
+	return (i8259->isr & ((low << 1) - 1)) ? 0 : low;
+}
+
+uint8_t i8259_nextintr(I8259_t* i8259) {
+	unsigned low = i8259_deliverable(i8259);
+	if (!low) return 0;
+	i8259->irr &= ~low;
+	if (!((i8259->icw[1] & 0x01) && (i8259->icw[4] & 0x02)))   /* not auto-EOI */
+		i8259->isr |= low;
+	return(i8259->icw[2] + __builtin_ctz(low));
+}""")
+wr("chipset/i8259.c", c)
+h = rd("chipset/i8259.h")
+h = sub(h, "uint8_t i8259_nextintr(I8259_t* i8259);", "uint8_t i8259_nextintr(I8259_t* i8259);\nunsigned i8259_deliverable(I8259_t* i8259);")
+wr("chipset/i8259.h", h)
+c = rd("cpu/cpu.c")
+c = sub(c, "\tif (!cpu->trap_toggle && (cpu->ifl && (i8259->irr & (~i8259->imr)))) {",
+           "\tif (!cpu->trap_toggle && cpu->ifl && i8259_deliverable(i8259)) {")
+wr("cpu/cpu.c", c)
 h = rd("cpu/cpu.h")
 h = sub(h, "void cpu_interruptCheck(CPU_t* cpu, I8259_t* i8259);", "void cpu_interruptCheck(CPU_t* cpu, I8259_t* i8259);\nextern I8259_t* cpu_pic;")
 wr("cpu/cpu.h", h)

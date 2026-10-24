@@ -62,7 +62,9 @@ static uint32_t silence_left;              /* 80h: samples of silence before the
 static uint64_t phase;                     /* instructions x rate, against ips */
 
 /* this frame's samples: position (instructions into the frame) and value */
-#define EV_MAX 1024                        /* 44.1 kHz / 60 = 735 a frame */
+#define EV_MAX 1000                        /* 44.1 kHz / 60 = 735 a frame; 1000 holds down to 44 fps.
+                                              Not 1024: those 96 B kept the last 4 KB guest-RAM chunk
+                                              when the PIC fix (static_mem.py) grew the code. */
 static struct { uint16_t pos; int8_t val; } ev[EV_MAX];
 static unsigned nev;
 static int8_t cur_level;
