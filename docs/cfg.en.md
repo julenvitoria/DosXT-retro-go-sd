@@ -7,11 +7,12 @@
 
 ## Where it goes
 
-For the image `/roms/dos/GAME.img` the core looks, in this order, for:
+For the image `/roms/dos/GAME.img`: `/roms/dos/doscfg/GAME.cfg`.
 
-1. `/cores/dos/GAME.cfg` (next to the core, so it does not show up in the game menu)
-2. `/roms/dos/cfg/GAME.cfg`
-3. `/roms/dos/GAME.cfg`
+Its own folder, so the other core (`dos386.bin`, which reads
+`/roms/dos/dos386cfg/`) can keep a `.cfg` for the same game without the two
+mixing. The old places (`/cores/dos/`, `/roms/dos/cfg/` and next to the image)
+are no longer read.
 
 All of it is optional: with no `.cfg`, the image boots by itself if it is a boot
 floppy, with the default buttons.
