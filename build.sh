@@ -106,6 +106,6 @@ ${ARMGCC}objcopy -O binary --only-section=.core_entry --only-section=.data "$A/d
 python3 "$REPO/tools/pack_core.py" --elf "$A/dos_core.elf" --bin "$A/dos_core.bin" \
     --system-name "MS-DOS" --dirname dos --extensions "img ima" \
     --core-name "gw-dos" --version 0.1.0 \
-    --header-logo "$HERE/src/assets/header.png" --pad-logo "$HERE/src/assets/pad.png" \
+    --header-logo "$HERE/src/assets/header.png" --pad-logo "$HERE/src/assets/pad.png" --logo-invert \
     --nm "${ARMGCC}nm" --objcopy "${ARMGCC}objcopy" --out "$OUT/dos.bin"
 echo "copy out/dos.bin to /cores/ and your disk images (.img) to /roms/dos/ on the SD card"
