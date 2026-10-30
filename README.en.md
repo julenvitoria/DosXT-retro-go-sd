@@ -25,7 +25,7 @@ says "ABI mismatch": reflash the firmware, or rebuild `dos.bin` against your che
 
 ```
 /cores/dos.bin                  <- out/dos.bin (the launcher finds it at boot)
-/cores/dos/<game>.cfg           <- per-game configuration (optional, see below)
+/roms/dos/doscfg/<game>.cfg     <- per-game configuration (optional, see below)
 /cores/dos/!BOOT.img            <- DOS boot floppy used by the cfgs (or in /roms/dos)
 /roms/dos/<anything>.img        <- your disk images
 ```
@@ -106,8 +106,8 @@ exits, DOS may ask for the disk with `COMMAND.COM`: put the boot floppy back.
 
 ## Per-game configuration (`.cfg`)
 
-Each game can have a `.cfg` with the same name (`/cores/dos/GAME.cfg`, next to the core, so it does
-not show up in the menu). The game can then be a plain data floppy (`fat12.py new`) while DOS boots
+Each game can have a `.cfg` with the same name in `/roms/dos/doscfg/` (`GAME.img` →
+`doscfg/GAME.cfg`). The game can then be a plain data floppy (`fat12.py new`) while DOS boots
 from your boot image (a hard disk with DOS, or a floppy). An example:
 
 ```ini

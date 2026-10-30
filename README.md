@@ -25,7 +25,7 @@ lanzador dirá "ABI mismatch": reflashea el firmware o recompila `dos.bin` contr
 
 ```
 /cores/dos.bin                  <- out/dos.bin (el lanzador lo detecta al arrancar)
-/cores/dos/<juego>.cfg          <- configuración por juego (opcional, ver más abajo)
+/roms/dos/doscfg/<juego>.cfg    <- configuración por juego (opcional, ver más abajo)
 /cores/dos/!BOOT.img        <- disquete de arranque del DOS para los cfg (o en /roms/dos)
 /roms/dos/<lo que quieras>.img  <- tus imágenes de disco
 ```
@@ -105,8 +105,8 @@ Al salir del programa, el DOS puede pedir el disco con `COMMAND.COM`: vuelve a p
 
 ## Configuración por juego (`.cfg`)
 
-Cada juego puede llevar un `.cfg` con su mismo nombre (`/cores/dos/JUEGO.cfg`, junto al core, para
-que no salga en el menú). Así el juego puede ser un disquete de datos normal (`fat12.py new`) y el DOS
+Cada juego puede llevar un `.cfg` con su mismo nombre en `/roms/dos/doscfg/` (`JUEGO.img` →
+`doscfg/JUEGO.cfg`). Así el juego puede ser un disquete de datos normal (`fat12.py new`) y el DOS
 arranca desde tu imagen de arranque (un disco duro con DOS o un disquete). Un ejemplo:
 
 ```ini
