@@ -7,12 +7,11 @@
 
 ## Dónde va
 
-Para la imagen `/roms/dos/JUEGO.img`: `/roms/dos/doscfg/JUEGO.cfg`.
+Para la imagen `/roms/dos/JUEGO.img`: `/cores/dos/JUEGO.cfg`.
 
-Una carpeta propia para que el otro núcleo (`dos386.bin`, que lee
-`/roms/dos/dos386cfg/`) pueda tener su `.cfg` para el mismo juego sin que se
-mezclen. Los sitios de antes (`/cores/dos/`, `/roms/dos/cfg/` y junto a la
-imagen) ya no se leen.
+Junto al núcleo, así no sale en el menú de juegos, y aparte del otro núcleo
+(`dos386.bin`, que lee `/cores/dos386/`), para que cada uno tenga su `.cfg`
+para el mismo juego. `/roms/dos/cfg/` y junto a la imagen ya no se leen.
 
 Todo es opcional: sin `.cfg`, la imagen arranca sola si es un disquete de
 arranque, con los botones por defecto.
