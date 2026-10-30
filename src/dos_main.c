@@ -27,10 +27,7 @@
 #endif
 #include "platform.h"
 #ifndef GWDOS_CFG_DIR
-#define GWDOS_CFG_DIR "/cores/dos"     /* boot images named by a cfg's boot = */
-#endif
-#ifndef GWDOS_CFG_SUBDIR
-#define GWDOS_CFG_SUBDIR "doscfg"      /* per-game .cfg files: <rom dir>/doscfg/GAME.cfg */
+#define GWDOS_CFG_DIR "/cores/dos"     /* per-game .cfg files, and boot images named by boot = */
 #endif
 #include "cga_render.h"
 #include "gamecfg.h"
@@ -898,14 +895,14 @@ static void load_config(void) {
     if (slash) *slash = 0; else strcpy(dos_dir, ".");
     if (!dos_dir[0]) strcpy(dos_dir, "/");
 
-    /* per-game configuration: <dir>/doscfg/<stem>.cfg, i.e. /roms/dos/doscfg/GAME.cfg. Its own
-       folder, so the TinyEMU core (dos386.bin, which reads dos386cfg/) can keep a .cfg for the
-       same image without either core reading the other's. */
+    /* per-game configuration: /cores/dos/<stem>.cfg -- beside the core, so the game menu does not
+       list it, and apart from the TinyEMU core's /cores/dos386/ so each core keeps its own .cfg
+       for the same image. */
     {
         char stem[64], cpath[320];
         snprintf(stem, sizeof(stem), "%s", base_name(boot));
         char* dot = strrchr(stem, '.'); if (dot) *dot = 0;
-        snprintf(cpath, sizeof(cpath), "%s/" GWDOS_CFG_SUBDIR "/%s.cfg", dos_dir, stem);
+        snprintf(cpath, sizeof(cpath), "%s/%s.cfg", GWDOS_CFG_DIR, stem);
         gamecfg_load(cpath, &gcfg);
         if (gcfg.loaded) { snprintf(cfg_name, sizeof(cfg_name), "%s.cfg", stem); apply_config(); }
     }
