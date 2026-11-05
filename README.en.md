@@ -1,25 +1,25 @@
-# gw-dos: MS-DOS (PC XT) for the Game & Watch (retro-go SD)
+# DosXT: MS-DOS (PC XT) for the Game & Watch (retro-go SD)
 
 *[Leer en español](README.md)*
 
 An emulated PC XT as an external core for the **retro-go SD** firmware:
 XTulator's 8088 CPU, Sergey Kiselev's free BIOS, CGA, EGA and VGA graphics,
-mouse, AdLib and Sound Blaster. It shows up in the menu as **MS-DOS** and each
+mouse, AdLib and Sound Blaster. It shows up in the menu as **DosXT** and each
 disk image is picked like a ROM.
 
 - It boots a **real MS-DOS**, which you supply (none is included).
 - For games that want a 286/386 (demanding VGA, extended memory) there is the
-  other core, [dos386-retro-go-sd](https://github.com/julenvitoria/dos386-retro-go-sd)
-  (`dos386.bin`). Both live on the same card.
+  other core, [DosAT-retro-go-sd](https://github.com/julenvitoria/DosAT-retro-go-sd)
+  (`dosat.bin`). Both live on the same card.
 - It needs a firmware from the `external_cores` branch (ABI v2, `b791f15` of
   11-10-2026 or later). With an older one the launcher says "ABI mismatch".
 
 ## On the SD card
 
 ```
-/cores/dos.bin             <- the core (out/dos.bin)
-/cores/dos/!BOOT.img       <- boot floppy with your MS-DOS
-/cores/dos/MONKEY.cfg      <- each game's configuration (optional), same name
+/cores/dosxt.bin           <- the core (out/dosxt.bin)
+/cores/dosxt/!BOOT.img     <- boot floppy with your MS-DOS
+/cores/dosxt/MONKEY.cfg    <- each game's configuration (optional), same name
 /roms/dos/MONKEY.img       <- each game, as a disk image
 ```
 
@@ -50,7 +50,7 @@ The `.cfg` tells the core which DOS to boot and what to type at the prompt. A
 complete example:
 
 ```ini
-; /cores/dos/MONKEY.cfg  -- the game is the hard disk /roms/dos/MONKEY.img
+; /cores/dosxt/MONKEY.cfg  -- the game is the hard disk /roms/dos/MONKEY.img
 boot   = !BOOT.img      ; boot DOS from this floppy (A:); the game is on C:
 run    = c:;cd \monkey;monkey a   ; typed at the prompt (";" = Enter)
 cpu    = 16             ; MHz: 4.77, 8, 10, 12, 16 or 20
@@ -86,6 +86,6 @@ On-screen keyboard, disk swapping, CPU speed and mouse:
 
 - [docs/desarrollo.en.md](docs/desarrollo.en.md): how it is built and how to
   build it.
-- Licence: XTulator is GPLv2+ and Sergey Kiselev's BIOS GPLv3, so `dos.bin` is
+- Licence: XTulator is GPLv2+ and Sergey Kiselev's BIOS GPLv3, so `dosxt.bin` is
   **GPLv3**. font8x8 by Daniel Hepper (public domain). No Microsoft software is
   included.

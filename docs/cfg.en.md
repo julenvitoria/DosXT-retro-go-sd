@@ -2,15 +2,15 @@
 
 *[Leer en español](cfg.md)*
 
-*Everything that can go in a game's `.cfg` for `dos.bin`. Back to the
+*Everything that can go in a game's `.cfg` for `dosxt.bin`. Back to the
 [README](../README.en.md).*
 
 ## Where it goes
 
-For the image `/roms/dos/GAME.img`: `/cores/dos/GAME.cfg`.
+For the image `/roms/dos/GAME.img`: `/cores/dosxt/GAME.cfg`.
 
 Next to the core, so it does not show up in the game menu, and apart from the
-other core (`dos386.bin`, which reads `/cores/dos386/`), so each keeps its own
+other core (`dosat.bin`, which reads `/cores/dosat/`), so each keeps its own
 `.cfg` for the same game. `/roms/dos/cfg/` and next to the image are no longer
 read.
 
@@ -31,7 +31,7 @@ floppy, with the default buttons.
 
 | Key | Values | What it does |
 |---|---|---|
-| `boot` | image name (`!BOOT.img`, `c.img`…) | DOS boots from that image. It is looked for in `/cores/dos`, then in `/roms/dos`. If it is a floppy, it boots on A: and the game is on B: (floppy) or C: (hard disk). If it is a hard disk with DOS installed, it boots on C: and the game is on A: (floppy) or D: (hard disk). |
+| `boot` | image name (`!BOOT.img`, `c.img`…) | DOS boots from that image. It is looked for in `/cores/dosxt`, then in `/roms/dos`. If it is a floppy, it boots on A: and the game is on B: (floppy) or C: (hard disk). If it is a hard disk with DOS installed, it boots on C: and the game is on A: (floppy) or D: (hard disk). |
 | `run` | commands separated by `;` | Typed at the DOS prompt, each one when the prompt (`A:\>`) appears, followed by Enter. E.g. `b:;cd \game;game`. |
 | `cpu` | `4.77`, `8`, `10`, `12`, `16`, `20` | CPU speed in MHz at boot (also changed with the `CPU` key on the on-screen keyboard). |
 | `video` | `vga` (default) or `cga` | `cga` removes the EGA/VGA graphics and leaves the full 640 KB to DOS. |
@@ -46,7 +46,7 @@ If no button is left as `keyboard`, TIME still opens the on-screen keyboard.
 
 This is not part of the `.cfg` but of each game: many are configured with a
 letter or a word after the executable's name, or with a setup program. In
-`dos.bin` they go in `run` (for example `run = b:;monkey a`).
+`dosxt.bin` they go in `run` (for example `run = b:;monkey a`).
 
 - **LucasArts games of the period (Monkey Island 1, Loom, Indiana Jones…)**:
   a letter after the executable picks the sound card: `a` = AdLib,
@@ -59,6 +59,6 @@ letter or a word after the executable's name, or with a setup program. In
 - **To find out what options a game has**: the manual or the `README`/`LEEME`
   in its folder, or try `GAME /?`.
 
-What `dos.bin` emulates: AdLib, Sound Blaster 2.0 (220h, IRQ 7, DMA 1:
+What `dosxt.bin` emulates: AdLib, Sound Blaster 2.0 (220h, IRQ 7, DMA 1:
 `BLASTER=A220 I7 D1 T3`) and the PC speaker. It does not emulate Roland MT-32,
 Gravis Ultrasound or Tandy/PCjr.

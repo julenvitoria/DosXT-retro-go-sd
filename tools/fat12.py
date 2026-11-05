@@ -366,7 +366,7 @@ def folder_bytes(path):
     return t
 
 # ---- ayuda (fat12.py, fat12.py -h, fat12.py help <orden>) ----
-HELP_INTRO = """fat12.py - herramienta para imágenes de disco DOS (FAT12/FAT16) de gw-dos y TinyEMU
+HELP_INTRO = """fat12.py - herramienta para imágenes de disco DOS (FAT12/FAT16) de DosXT y DosAT
 Disquetes y discos duros (hasta 500 MB). Solo necesita Python 3.
 
 Uso:  python3 fat12.py <orden> <argumentos...>
@@ -413,11 +413,11 @@ HELP = [
      "escribe un AUTOEXEC.BAT que lanza esa orden.",
      ["python3 fat12.py sysdisk Disk01.img alley.img --run \"ALLEYCAT\" ALLEYCAT.EXE"]),
     ("todsk", "todsk <juego.img|carpeta> <JUEGO.dsk> [--run \"ORDEN;ORDEN\"]",
-     "Crea un .dsk para el core TinyEMU (dos386.bin). Copia la imagen, o la\n"
+     "Crea un .dsk para el núcleo DosAT (dosat.bin). Copia la imagen, o la\n"
      "construye desde una carpeta (disquete si cabe, si no disco duro), y\n"
      "escribe el AUTOEXEC.BAT con el programa que el core arranca. Sin --run\n"
      "intenta adivinar el programa y te dice cuál ha elegido; varias órdenes\n"
-     "se separan con ';'. Copia el .dsk a /roms/dos/ (y su .cfg a /cores/dos386/).",
+     "se separan con ';'. Copia el .dsk a /roms/dos/ (y su .cfg a /cores/dosat/).",
      ["python3 fat12.py todsk alleycat.img ALLEYCAT.dsk",
       "python3 fat12.py todsk loom LOOM.dsk",
       "python3 fat12.py todsk rick2.img RICK2.dsk --run \"RICK2\"",
@@ -445,7 +445,7 @@ def print_help(cmd=None):
         "newhd": "crea un disco duro (hasta 500 MB) vacío o desde carpetas",
         "bootdisk": "disco de arranque desde el disco 1 de MS-DOS 6.x",
         "sysdisk": "disquete arrancable con DOS mínimo + tu juego",
-        "todsk": "crea un .dsk para TinyEMU (dos386.bin)",
+        "todsk": "crea un .dsk para DosAT (dosat.bin)",
     }
     for name, syn, desc, ex in HELP:
         print("  %-10s %s" % (name, short[name]))

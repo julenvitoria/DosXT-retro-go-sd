@@ -27,7 +27,7 @@
 #endif
 #include "platform.h"
 #ifndef GWDOS_CFG_DIR
-#define GWDOS_CFG_DIR "/cores/dos"     /* per-game .cfg files, and boot images named by boot = */
+#define GWDOS_CFG_DIR "/cores/dosxt"   /* per-game .cfg files, and boot images named by boot = */
 #endif
 #include "cga_render.h"
 #include "gamecfg.h"
@@ -517,7 +517,7 @@ static void draw_bands(uint8_t* fb) {
             snprintf(line, sizeof(line), "No encuentro %.26s", boot_missing);
             ui_fill(fb, 0, 0, 320, PIC_Y, 0);
             ui_text(fb, 0, 2, line, 12, 0);
-            ui_text(fb, 0, 11, "Ponlo en /cores/dos o junto al juego", 12, 0);
+            ui_text(fb, 0, 11, "Ponlo en /cores/dosxt o junto al juego", 12, 0);
         }
     }
 }
@@ -895,7 +895,7 @@ static void load_config(void) {
     if (slash) *slash = 0; else strcpy(dos_dir, ".");
     if (!dos_dir[0]) strcpy(dos_dir, "/");
 
-    /* per-game configuration: /cores/dos/<stem>.cfg -- beside the core, so the game menu does not
+    /* per-game configuration: /cores/dosxt/<stem>.cfg -- beside the core, so the game menu does not
        list it, and apart from the TinyEMU core's /cores/dos386/ so each core keeps its own .cfg
        for the same image. */
     {
@@ -917,7 +917,7 @@ static void insert_boot_disks(void) {
     if (gcfg.loaded && gcfg.boot[0]) {               /* boot DOS from another image, game as B:/C: */
         char bpath[320];
         if (gcfg.boot[0] == '/') snprintf(bpath, sizeof(bpath), "%s", gcfg.boot);
-        else {                                       /* /cores/dos/<boot>, else next to the game */
+        else {                                       /* /cores/dosxt/<boot>, else next to the game */
             snprintf(bpath, sizeof(bpath), "%s/%s", GWDOS_CFG_DIR, gcfg.boot);
             if (file_size(bpath) <= 0) snprintf(bpath, sizeof(bpath), "%s/%s", dos_dir, gcfg.boot);
         }

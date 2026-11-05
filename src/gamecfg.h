@@ -1,5 +1,5 @@
 /*
-  gw-dos per-game configuration (/cores/dos/<image name>.cfg; also /roms/dos/cfg/ or next to the image).
+  gw-dos per-game configuration (/cores/dosxt/<image name>.cfg; also /roms/dos/cfg/ or next to the image).
 
     ; comment                      (also #)
     boot   = MS-DOS 6.22.img       ; boot DOS from this image (A:); the game image becomes
