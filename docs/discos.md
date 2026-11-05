@@ -22,7 +22,7 @@ Esto hace una copia que se queda en `A:\>` con el teclado español:
 python3 tools/fat12.py bootdisk Disk01.img !BOOT.img
 ```
 
-Ponlo en `/cores/dos/` (o en `/roms/dos/` si quieres elegirlo en el menú). Trae
+Ponlo en `/cores/dosxt/` (o en `/roms/dos/` si quieres elegirlo en el menú). Trae
 `FORMAT`, `FDISK`, `SYS`, `EDIT`, `QBASIC`, `MEM`… El original no se modifica.
 
 ## Un juego en disquete
@@ -79,9 +79,9 @@ Desde entonces, `boot = c.img` en el `.cfg` de un juego arranca ese DOS, y el
 juego queda en A: (`run = a:;juego`). Probado con MS-DOS 5.0 en español.
 Consejo: a "Ejecutar Shell al inicio" contesta NO; en un 8088 es lento.
 
-## Para el otro núcleo (`dos386.bin`)
+## Para el otro núcleo (`dosat.bin`)
 
-`todsk` convierte una imagen o una carpeta en el `.dsk` que usa TinyEMU:
+`todsk` convierte una imagen o una carpeta en el `.dsk` que usa DosAT:
 
 ```
 python3 tools/fat12.py todsk monkey MONKEY.dsk --run "CD MONKEY;MONKEY"

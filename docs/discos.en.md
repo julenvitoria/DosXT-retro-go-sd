@@ -22,7 +22,7 @@ copy that stops at `A:\>` with the Spanish keyboard:
 python3 tools/fat12.py bootdisk Disk01.img !BOOT.img
 ```
 
-Put it in `/cores/dos/` (or in `/roms/dos/` if you want to pick it from the
+Put it in `/cores/dosxt/` (or in `/roms/dos/` if you want to pick it from the
 menu). It carries `FORMAT`, `FDISK`, `SYS`, `EDIT`, `QBASIC`, `MEM`… The
 original is not modified.
 
@@ -80,9 +80,9 @@ From then on, `boot = c.img` in a game's `.cfg` boots that DOS, and the game is
 on A: (`run = a:;game`). Tested with Spanish MS-DOS 5.0. Tip: answer NO to
 "Run Shell at startup"; on an 8088 it is slow.
 
-## For the other core (`dos386.bin`)
+## For the other core (`dosat.bin`)
 
-`todsk` turns an image or a folder into the `.dsk` TinyEMU uses:
+`todsk` turns an image or a folder into the `.dsk` DosAT uses:
 
 ```
 python3 tools/fat12.py todsk monkey MONKEY.dsk --run "CD MONKEY;MONKEY"

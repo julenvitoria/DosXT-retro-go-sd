@@ -4,7 +4,7 @@
 #
 #   ./build.sh                                  host test only (no ARM toolchain needed)
 #   REPO=/path/to/retro-go-sd-external_cores GCC_PATH=/path/to/arm-gnu-toolchain/bin ./build.sh
-#                                               host test + out/dos.bin for the console
+#                                               host test + out/dosxt.bin for the console
 #
 # REPO must be a checkout of the external_cores branch (same one your firmware was built
 # from), with the FatFs submodule and the ST drivers present (`make download_sdk` there).
@@ -69,7 +69,7 @@ ARMGCC=""
 if [ -n "${GCC_PATH:-}" ] && [ -x "$GCC_PATH/arm-none-eabi-gcc" ]; then ARMGCC="$GCC_PATH/arm-none-eabi-"
 elif command -v arm-none-eabi-gcc >/dev/null; then ARMGCC="arm-none-eabi-"; fi
 if [ -z "$ARMGCC" ] || [ -z "${REPO:-}" ]; then
-  echo "(set REPO and GCC_PATH to build out/dos.bin for the console)"; exit 0
+  echo "(set REPO and GCC_PATH to build out/dosxt.bin for the console)"; exit 0
 fi
 CC_DIR="$REPO/Core/Src/porting/core_common"
 [ -f "$CC_DIR/gw_core_bridge.c" ] && [ -f "$REPO/tools/pack_core.py" ] && [ -f "$REPO/ld/gnw_ram_emu.ld" ] || \
@@ -104,8 +104,8 @@ ${ARMGCC}gcc "$A"/*.o $MCU -nostdlib -lgcc -T"$HERE/sdk/core_ram_emu.ld" -L"$REP
     -Wl,-Map="$A/dos_core.map" -Wl,--gc-sections -Wl,--no-check-sections -o "$A/dos_core.elf"
 ${ARMGCC}objcopy -O binary --only-section=.core_entry --only-section=.data "$A/dos_core.elf" "$A/dos_core.bin"
 python3 "$REPO/tools/pack_core.py" --elf "$A/dos_core.elf" --bin "$A/dos_core.bin" \
-    --system-name "MS-DOS" --dirname dos --extensions "img ima" \
-    --core-name "gw-dos" --version 0.1.0 \
+    --system-name "DosXT" --dirname dos --extensions "img ima" \
+    --core-name "DosXT (XTulator)" --version 0.1.0 \
     --header-logo "$HERE/src/assets/header.png" --pad-logo "$HERE/src/assets/pad.png" --logo-invert \
-    --nm "${ARMGCC}nm" --objcopy "${ARMGCC}objcopy" --out "$OUT/dos.bin"
-echo "copy out/dos.bin to /cores/ and your disk images (.img) to /roms/dos/ on the SD card"
+    --nm "${ARMGCC}nm" --objcopy "${ARMGCC}objcopy" --out "$OUT/dosxt.bin"
+echo "copy out/dosxt.bin to /cores/ and your disk images (.img) to /roms/dos/ on the SD card"

@@ -1,25 +1,25 @@
-# gw-dos: MS-DOS (PC XT) para la Game & Watch (retro-go SD)
+# DosXT: MS-DOS (PC XT) para la Game & Watch (retro-go SD)
 
 *[Read in English](README.en.md)*
 
 Un PC XT emulado como núcleo externo del firmware **retro-go SD**: CPU 8088 de
 XTulator, BIOS libre de Sergey Kiselev, gráficos CGA, EGA y VGA, ratón, AdLib y
-Sound Blaster. Aparece en el menú como **MS-DOS** y cada imagen de disco se
+Sound Blaster. Aparece en el menú como **DosXT** y cada imagen de disco se
 elige como una ROM.
 
 - Arranca un **MS-DOS de verdad**, que pones tú (no se incluye ninguno).
 - Para juegos que piden un 286/386 (VGA exigente, memoria extendida) está el
-  otro núcleo, [dos386-retro-go-sd](https://github.com/julenvitoria/dos386-retro-go-sd)
-  (`dos386.bin`). Los dos conviven en la misma tarjeta.
+  otro núcleo, [DosAT-retro-go-sd](https://github.com/julenvitoria/DosAT-retro-go-sd)
+  (`dosat.bin`). Los dos conviven en la misma tarjeta.
 - Necesita un firmware de la rama `external_cores` (ABI v2, `b791f15` del
   11-10-2026 o posterior). Con uno más antiguo el lanzador dice "ABI mismatch".
 
 ## En la tarjeta SD
 
 ```
-/cores/dos.bin             <- el núcleo (out/dos.bin)
-/cores/dos/!BOOT.img       <- disquete de arranque con tu MS-DOS
-/cores/dos/MONKEY.cfg      <- configuración de cada juego (opcional), mismo nombre
+/cores/dosxt.bin           <- el núcleo (out/dosxt.bin)
+/cores/dosxt/!BOOT.img     <- disquete de arranque con tu MS-DOS
+/cores/dosxt/MONKEY.cfg    <- configuración de cada juego (opcional), mismo nombre
 /roms/dos/MONKEY.img       <- cada juego, como imagen de disco
 ```
 
@@ -50,7 +50,7 @@ El `.cfg` le dice al núcleo con qué DOS arrancar y qué escribir en el prompt.
 Un ejemplo completo:
 
 ```ini
-; /cores/dos/MONKEY.cfg  -- el juego es el disco duro /roms/dos/MONKEY.img
+; /cores/dosxt/MONKEY.cfg  -- el juego es el disco duro /roms/dos/MONKEY.img
 boot   = !BOOT.img      ; arranca el DOS desde este disquete (A:); el juego queda en C:
 run    = c:;cd \monkey;monkey a   ; lo que se escribe en el prompt (";" = Intro)
 cpu    = 16             ; MHz: 4.77, 8, 10, 12, 16 o 20
@@ -86,5 +86,5 @@ Teclado en pantalla, cambio de disco, velocidad de la CPU y ratón:
 
 - [docs/desarrollo.md](docs/desarrollo.md): cómo está hecho y cómo compilarlo.
 - Licencia: XTulator es GPLv2+ y la BIOS de Sergey Kiselev GPLv3, así que
-  `dos.bin` es **GPLv3**. Fuente font8x8 de Daniel Hepper (dominio público).
+  `dosxt.bin` es **GPLv3**. Fuente font8x8 de Daniel Hepper (dominio público).
   No incluye ningún software de Microsoft.
