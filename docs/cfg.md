@@ -3,7 +3,7 @@
 *[Read in English](cfg.en.md)*
 
 *Todo lo que se puede poner en el `.cfg` de un juego para `dos.bin`. Vuelve al
-[README](../README.md#configuración-por-juego-cfg).*
+[README](../README.md).*
 
 ## Dónde va
 
@@ -36,7 +36,7 @@ arranque, con los botones por defecto.
 | `video` | `vga` (por defecto) o `cga` | `cga` quita los gráficos EGA/VGA y deja 640 KB enteros para el DOS. |
 | `vram` | `64`, `128` (por defecto), `256` | Memoria de vídeo EGA/VGA en KB. Si un juego avisa de "Falta memoria de video", súbela. |
 | `zoom80` | `1` / `0` | Texto de 80 columnas: `1` = ventana de 40 columnas que sigue al cursor, `0` = la línea entera. |
-| `mouse` (o `raton`) | `on` / `off` | Ratón: la cruceta mueve el puntero y A/B son los botones (ver el README, "Ratón"). |
+| `mouse` (o `raton`) | `on` / `off` | Ratón: la cruceta mueve el puntero y A/B son los botones (ver [controles.md](controles.md#ratón)). |
 | `up` `down` `left` `right` (o `arriba` `abajo` `izquierda` `derecha`), `a`, `b`, `game`, `time`, `start` (o `x`), `select` (o `y`) | nombre de tecla, o hasta 3 con `+` | Qué tecla del PC manda cada botón. Lista de nombres: [`teclas.md`](teclas.md). Además: `keyboard`/`teclado` (abre el teclado en pantalla), `none`/`nada` (sin función) y, para el ratón, `click` `click2` `mup` `mdown` `mleft` `mright`. |
 
 Si ningún botón queda como `keyboard`, TIME sigue abriendo el teclado en

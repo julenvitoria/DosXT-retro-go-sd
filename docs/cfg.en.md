@@ -3,7 +3,7 @@
 *[Leer en español](cfg.md)*
 
 *Everything that can go in a game's `.cfg` for `dos.bin`. Back to the
-[README](../README.en.md#per-game-configuration-cfg).*
+[README](../README.en.md).*
 
 ## Where it goes
 
@@ -37,7 +37,7 @@ floppy, with the default buttons.
 | `video` | `vga` (default) or `cga` | `cga` removes the EGA/VGA graphics and leaves the full 640 KB to DOS. |
 | `vram` | `64`, `128` (default), `256` | EGA/VGA video memory in KB. If a game warns "Falta memoria de video", raise it. |
 | `zoom80` | `1` / `0` | 80-column text: `1` = 40-column window that follows the cursor, `0` = the whole line. |
-| `mouse` (or `raton`) | `on` / `off` | Mouse: the d-pad moves the pointer and A/B are the buttons (see the README, "Mouse"). |
+| `mouse` (or `raton`) | `on` / `off` | Mouse: the d-pad moves the pointer and A/B are the buttons (see [controles.en.md](controles.en.md#mouse)). |
 | `up` `down` `left` `right` (or `arriba` `abajo` `izquierda` `derecha`), `a`, `b`, `game`, `time`, `start` (or `x`), `select` (or `y`) | key name, or up to 3 joined with `+` | Which PC key each button sends. List of names: [`teclas.en.md`](teclas.en.md). Also: `keyboard`/`teclado` (opens the on-screen keyboard), `none`/`nada` (does nothing) and, for the mouse, `click` `click2` `mup` `mdown` `mleft` `mright`. |
 
 If no button is left as `keyboard`, TIME still opens the on-screen keyboard.
