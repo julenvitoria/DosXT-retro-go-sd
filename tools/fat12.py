@@ -417,7 +417,7 @@ HELP = [
      "construye desde una carpeta (disquete si cabe, si no disco duro), y\n"
      "escribe el AUTOEXEC.BAT con el programa que el core arranca. Sin --run\n"
      "intenta adivinar el programa y te dice cuál ha elegido; varias órdenes\n"
-     "se separan con ';'. Copia el .dsk (y su .cfg) a /roms/dos/.",
+     "se separan con ';'. Copia el .dsk a /roms/dos/ (y su .cfg a /cores/dos386/).",
      ["python3 fat12.py todsk alleycat.img ALLEYCAT.dsk",
       "python3 fat12.py todsk loom LOOM.dsk",
       "python3 fat12.py todsk rick2.img RICK2.dsk --run \"RICK2\"",
