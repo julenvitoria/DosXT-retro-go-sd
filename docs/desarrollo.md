@@ -5,16 +5,23 @@
 ## Compilar
 
 ```
-./build.sh                                              # solo pruebas en el PC
-REPO=/ruta/retro-go-sd-external_cores GCC_PATH=/ruta/arm-gnu-toolchain/bin ./build.sh
+GCC_PATH=/ruta/arm-gnu-toolchain/bin ./build.sh         # pruebas en el PC + out/dosxt.bin
+./build.sh                                              # solo pruebas en el PC (sin compilador ARM)
 DOSIMG=/ruta/disquete.img ./build.sh                    # además arranca tu DOS en la prueba
 ```
 
-`REPO` es un checkout de la rama `external_cores` (la misma con la que se
-compiló el firmware), con el submódulo FatFs y los drivers de ST
-(`make download_sdk`). Solo se lee: cabeceras, el puente
-`Core/Src/porting/core_common`, `ld/` y `tools/pack_core.py`. Necesita git, gcc,
-nasm y python3 (Pillow, opcional, para las capturas PNG de `work/shots/`).
+La parte del firmware (cabeceras, el puente `core_common`, los linker scripts y
+`pack_core.py`) va copiada en `sdk/`, sacada de la rama `external_cores` de
+sylverb; `SDK_VERSION` dice de qué commit. Para ponerla al día:
+`scripts/sync_sdk.sh /ruta/game-and-watch-retro-go-sd` (un checkout de esa rama
+con el submódulo FatFs y `make download_sdk`), y luego
+`git checkout -- sdk/include/Drivers` para quedarte con los drivers de ST de
+siempre. `REPO=/ruta/checkout ./build.sh` compila contra ese checkout en vez de
+`sdk/`. Necesita git, gcc, nasm y python3 con Pillow (para los logos y las
+capturas PNG de `work/shots/`).
+
+Cada push a GitHub lo compila (Actions → "Build DosXT core") y deja `dosxt.bin`
+como artifact; al crear una release con un tag nuevo se adjunta a ella.
 
 ## Cómo está hecho
 

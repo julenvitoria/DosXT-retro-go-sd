@@ -1,8 +1,7 @@
 name: Build DosXT core
 
-# Builds out/dosxt.bin with build.sh against the firmware's external_cores branch
-# (the core bridge, linker scripts and pack_core.py come from there) and keeps it as an artifact;
-# for a tag (a new release) dosxt.bin is also attached to the release.
+# Builds out/dosxt.bin with build.sh (firmware SDK vendored in sdk/, see SDK_VERSION) and
+# keeps it as an artifact; for a tag (a new release) dosxt.bin is also attached to the release.
 
 on:
   workflow_dispatch:
@@ -12,10 +11,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FW_REPO: sylverb/game-and-watch-retro-go-sd
-  FW_BRANCH: external_cores
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,13 +18,6 @@ jobs:
     steps:
       - name: Checkout core
         uses: actions/checkout@v4
-
-      - name: Checkout firmware (${{ env.FW_BRANCH }})
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.FW_REPO }}
-          ref: ${{ env.FW_BRANCH }}
-          path: fw
 
       - name: Install tools
         run: |
@@ -41,13 +29,8 @@ jobs:
           tar -xf toolchain.tar.xz -C "$RUNNER_TEMP"
           echo "GCC_PATH=$RUNNER_TEMP/arm-gnu-toolchain-15.2.rel1-x86_64-arm-none-eabi/bin" >> "$GITHUB_ENV"
 
-      - name: Prepare firmware tree (FatFs + ST drivers)
-        run: |
-          git -C fw submodule update --init --depth 1 Core/Src/porting/lib/FatFs
-          make -C fw download_sdk CHECK_DIRTY_SUBMODULE=0 GCC_PATH="$GCC_PATH"
-
       - name: Build
-        run: REPO="$GITHUB_WORKSPACE/fw" ./build.sh
+        run: ./build.sh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
