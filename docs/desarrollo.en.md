@@ -5,16 +5,23 @@
 ## Building
 
 ```
-./build.sh                                              # host tests only
-REPO=/path/retro-go-sd-external_cores GCC_PATH=/path/arm-gnu-toolchain/bin ./build.sh
+GCC_PATH=/path/arm-gnu-toolchain/bin ./build.sh         # host tests + out/dosxt.bin
+./build.sh                                              # host tests only (no ARM compiler)
 DOSIMG=/path/floppy.img ./build.sh                      # also boots your DOS in the test
 ```
 
-`REPO` is a checkout of the `external_cores` branch (the one the firmware was
-built from), with the FatFs submodule and ST's drivers (`make download_sdk`).
-It is only read: headers, the `Core/Src/porting/core_common` bridge, `ld/` and
-`tools/pack_core.py`. It needs git, gcc, nasm and python3 (Pillow, optional, for
-the PNG captures in `work/shots/`).
+The firmware side (headers, the `core_common` bridge, the linker scripts and
+`pack_core.py`) is vendored in `sdk/`, taken from sylverb's `external_cores`
+branch; `SDK_VERSION` names the commit. To refresh it:
+`scripts/sync_sdk.sh /path/game-and-watch-retro-go-sd` (a checkout of that branch
+with the FatFs submodule and `make download_sdk`), then
+`git checkout -- sdk/include/Drivers` to keep the usual ST drivers.
+`REPO=/path/checkout ./build.sh` builds against that checkout instead of `sdk/`.
+It needs git, gcc, nasm and python3 with Pillow (for the logos and the PNG
+captures in `work/shots/`).
+
+Every push to GitHub builds it (Actions → "Build DosXT core") and keeps
+`dosxt.bin` as an artifact; a release made with a new tag gets it attached.
 
 ## How it is built
 

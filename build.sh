@@ -2,14 +2,15 @@
 # gw-dos: build the MS-DOS (XT/CGA) external core for the Game & Watch retro-go SD firmware
 # (branch "external_cores", firmware ABI v2: cores are /cores/*.bin with a CORE header).
 #
-#   ./build.sh                                  host test only (no ARM toolchain needed)
-#   REPO=/path/to/retro-go-sd-external_cores GCC_PATH=/path/to/arm-gnu-toolchain/bin ./build.sh
-#                                               host test + out/dosxt.bin for the console
+#   ./build.sh            host test + out/dosxt.bin for the console (host test only when there
+#                         is no arm-none-eabi-gcc on PATH and no GCC_PATH)
+#   GCC_PATH=/path/to/arm-gnu-toolchain/bin ./build.sh
 #
-# REPO must be a checkout of the external_cores branch (same one your firmware was built
-# from), with the FatFs submodule and the ST drivers present (`make download_sdk` there).
-# It is only read: headers, the core bridge (Core/Src/porting/core_common), ld/ and
-# tools/pack_core.py. Nothing is written into it.
+# The firmware side (headers, the core bridge, linker scripts, pack_core.py) comes from the
+# SDK snapshot in sdk/ -- see SDK_VERSION for the firmware commit, scripts/sync_sdk.sh to
+# refresh it. REPO=/path/to/game-and-watch-retro-go-sd (external_cores, with its FatFs
+# submodule and `make download_sdk` done) builds against that checkout instead; it is only
+# read, nothing is written into it.
 # Optional: DOSIMG=/path/to/bootable_floppy.img also boots that disk in the host test.
 # Needs: git, gcc, nasm, python3 (+ Pillow for PNG screenshots, optional), github.com access.
 set -euo pipefail
@@ -68,14 +69,19 @@ EOF
 ARMGCC=""
 if [ -n "${GCC_PATH:-}" ] && [ -x "$GCC_PATH/arm-none-eabi-gcc" ]; then ARMGCC="$GCC_PATH/arm-none-eabi-"
 elif command -v arm-none-eabi-gcc >/dev/null; then ARMGCC="arm-none-eabi-"; fi
-if [ -z "$ARMGCC" ] || [ -z "${REPO:-}" ]; then
-  echo "(set REPO and GCC_PATH to build out/dosxt.bin for the console)"; exit 0
+if [ -z "$ARMGCC" ]; then
+  echo "(no ARM toolchain: set GCC_PATH or put arm-none-eabi-gcc on PATH to build out/dosxt.bin)"; exit 0
 fi
-CC_DIR="$REPO/Core/Src/porting/core_common"
-[ -f "$CC_DIR/gw_core_bridge.c" ] && [ -f "$REPO/tools/pack_core.py" ] && [ -f "$REPO/ld/gnw_ram_emu.ld" ] || \
-  { echo "REPO is not an external_cores checkout (no core_common bridge / pack_core.py)"; exit 1; }
-[ -f "$REPO/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h" ] || { echo "REPO has no ST drivers yet: run 'make download_sdk' there"; exit 1; }
-[ -f "$REPO/Core/Src/porting/lib/FatFs/ff.h" ] || { echo "REPO submodules missing: git submodule update --init Core/Src/porting/lib/FatFs"; exit 1; }
+if [ -n "${REPO:-}" ]; then        # a firmware checkout
+  INC_ROOT="$REPO"; CC_DIR="$REPO/Core/Src/porting/core_common"; LD_DIR="$REPO/ld"; PACK="$REPO/tools/pack_core.py"
+  [ -f "$CC_DIR/gw_core_bridge.c" ] && [ -f "$PACK" ] && [ -f "$LD_DIR/gnw_ram_emu.ld" ] || \
+    { echo "REPO is not an external_cores checkout (no core_common bridge / pack_core.py)"; exit 1; }
+  [ -f "$REPO/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h" ] || { echo "REPO has no ST drivers yet: run 'make download_sdk' there"; exit 1; }
+  [ -f "$REPO/Core/Src/porting/lib/FatFs/ff.h" ] || { echo "REPO submodules missing: git submodule update --init Core/Src/porting/lib/FatFs"; exit 1; }
+else                               # the snapshot in sdk/
+  INC_ROOT="$HERE/sdk/include"; CC_DIR="$HERE/sdk/src"; LD_DIR="$HERE/sdk/ld"; PACK="$HERE/sdk/tools/pack_core.py"
+  [ -f "$CC_DIR/gw_core_bridge.c" ] || { echo "sdk/ is incomplete: run scripts/sync_sdk.sh"; exit 1; }
+fi
 
 # same flags as the core SDK's cores/_template/Makefile
 MCU="-mcpu=cortex-m7 -mtune=cortex-m7 -mthumb -mno-unaligned-access -mfpu=fpv5-d16 -mfloat-abi=hard"
@@ -83,9 +89,10 @@ SDKDEFS="-DUSE_HAL_DRIVER -DSTM32H7B0xx -DSD_CARD=1 -DGNW_DISABLE_COMPRESSION -D
 SDKINC=""
 for d in Core/Inc Core/Inc/retro-go Core/Inc/porting Core/Src/porting/core_common Core/Src/porting/lib \
          Core/Src/porting/lib/FatFs Drivers/STM32H7xx_HAL_Driver/Inc Drivers/STM32H7xx_HAL_Driver/Inc/Legacy \
-         Drivers/CMSIS/Device/ST/STM32H7xx/Include Drivers/CMSIS/Include; do SDKINC="$SDKINC -I$REPO/$d"; done
+         Drivers/CMSIS/Device/ST/STM32H7xx/Include Drivers/CMSIS/Include; do SDKINC="$SDKINC -I$INC_ROOT/$d"; done
+SDKINC="$SDKINC -I$CC_DIR"         # the bridge headers (sdk/src in the snapshot)
 CF="$MCU -O2 -Wall -fdata-sections -ffunction-sections -fno-common $SDKDEFS $SDKINC $WARN $DEFS -DXT_NO_STDIO"
-REDEF="$REPO/Core/Src/porting/core_common/gw_core_bridge_redefine_syms.txt"
+REDEF="$CC_DIR/gw_core_bridge_redefine_syms.txt"
 A="$W/arm"; rm -rf "$A"; mkdir -p "$A"
 cc_core() {   # <source> <object> [extra flags...]: compile + rename firmware calls to core_* trampolines
   local src="$1" obj="$2"; shift 2
@@ -100,10 +107,10 @@ cc_core "$CC_DIR/gw_core_i18n.c" "$A/gw_core_i18n.o"
 ${ARMGCC}gcc -c $CF -fno-builtin-memcpy -fno-builtin-memmove -fno-builtin-memset \
     "$CC_DIR/gw_core_bridge.c" -o "$A/gw_core_bridge.o"               # the bridge itself is not renamed
 ${ARMGCC}gcc -x assembler-with-cpp -c $MCU $SDKDEFS "$CC_DIR/gw_core_entry.S" -o "$A/gw_core_entry.o"
-${ARMGCC}gcc "$A"/*.o $MCU -nostdlib -lgcc -T"$HERE/sdk/core_ram_emu.ld" -L"$REPO/ld" \
+${ARMGCC}gcc "$A"/*.o $MCU -nostdlib -lgcc -T"$HERE/sdk/core_ram_emu.ld" -L"$LD_DIR" \
     -Wl,-Map="$A/dos_core.map" -Wl,--gc-sections -Wl,--no-check-sections -o "$A/dos_core.elf"
 ${ARMGCC}objcopy -O binary --only-section=.core_entry --only-section=.data "$A/dos_core.elf" "$A/dos_core.bin"
-python3 "$REPO/tools/pack_core.py" --elf "$A/dos_core.elf" --bin "$A/dos_core.bin" \
+python3 "$PACK" --elf "$A/dos_core.elf" --bin "$A/dos_core.bin" \
     --system-name "DosXT" --dirname dos --extensions "img ima" \
     --core-name "DosXT (XTulator)" --version 0.1.0 \
     --header-logo "$HERE/src/assets/header.png" --pad-logo "$HERE/src/assets/pad.png" --logo-invert \
