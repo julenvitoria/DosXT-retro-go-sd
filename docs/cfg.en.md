@@ -11,8 +11,7 @@ For the image `/roms/dos/GAME.img`: `/cores/dosxt/GAME.cfg`.
 
 Next to the core, so it does not show up in the game menu, and apart from the
 other core (`dosat.bin`, which reads `/cores/dosat/`), so each keeps its own
-`.cfg` for the same game. `/roms/dos/cfg/` and next to the image are no longer
-read.
+`.cfg` for the same game.
 
 All of it is optional: with no `.cfg`, the image boots by itself if it is a boot
 floppy, with the default buttons.

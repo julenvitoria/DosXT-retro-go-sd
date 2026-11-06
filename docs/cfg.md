@@ -11,7 +11,7 @@ Para la imagen `/roms/dos/JUEGO.img`: `/cores/dosxt/JUEGO.cfg`.
 
 Junto al núcleo, así no sale en el menú de juegos, y aparte del otro núcleo
 (`dosat.bin`, que lee `/cores/dosat/`), para que cada uno tenga su `.cfg`
-para el mismo juego. `/roms/dos/cfg/` y junto a la imagen ya no se leen.
+para el mismo juego.
 
 Todo es opcional: sin `.cfg`, la imagen arranca sola si es un disquete de
 arranque, con los botones por defecto.
