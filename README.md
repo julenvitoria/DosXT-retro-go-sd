@@ -82,6 +82,25 @@ Teclado en pantalla, cambio de disco, velocidad de la CPU y ratón:
 [docs/controles.md](docs/controles.md). Vídeo y sonido:
 [docs/video-sonido.md](docs/video-sonido.md).
 
+## Partidas guardadas
+
+Desde el menú de retro-go (**PAUSE/SET**) puedes guardar la partida en
+cualquiera de sus huecos y volver a ella cuando quieras. Al lanzar un juego que
+tiene partidas guardadas, retro-go te deja elegir entre **Continuar** y empezar
+de nuevo.
+
+- **Qué se guarda:** el PC XT entero: CPU, toda la memoria (con el DOS y el
+  juego cargados), vídeo, sonido y qué disquete había en A:. Cada guardado
+  ocupa alrededor de 1 MB y tarda unos segundos en guardarse y en cargarse.
+- **Solo vale con el mismo `dosxt.bin`.** Si actualizas el núcleo, los
+  guardados de antes se rechazan: no se carga nada y el juego sigue como
+  estaba.
+- **Las imágenes de disco no vuelven atrás.** Lo que el juego haya escrito en
+  su `.img` (sus propias partidas, récords) se queda como esté, y el DOS
+  recuperado puede no saber de ello hasta que vuelva a leer el disco. Lo más
+  seguro es usar o los guardados de retro-go o las partidas del propio juego,
+  no mezclarlos.
+
 ## Más
 
 - [docs/desarrollo.md](docs/desarrollo.md): cómo está hecho y cómo compilarlo.

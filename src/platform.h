@@ -59,3 +59,18 @@ void    plat_setting_set(const char* key, int32_t value);
 uint32_t plat_ms(void);
 /* Free-running CPU cycle counter (any rate; the governor calibrates it against plat_ms) */
 uint32_t plat_cycles(void);
+
+/* ---- savestates (platform_core.c drives them, the frontend owns the disks) ----
+   A state is every byte of core RAM. What belongs to THIS session rather than
+   the saved machine -- the open disk-image FILEs, the start-up info timer -- is
+   taken before a load and put back after it; a different disk in A: is
+   re-inserted by name. */
+typedef struct {
+    void*    disk[4];
+    uint8_t  ins[4];
+    char     a[48];
+    uint32_t info_until;
+} dos_ss_live_t;
+void dos_ss_presave(void);
+void dos_ss_live_get(dos_ss_live_t* l);
+void dos_ss_live_put(const dos_ss_live_t* l);
