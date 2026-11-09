@@ -27,6 +27,8 @@
 /* from ld/gnw_ram_emu.ld (shared with the firmware) */
 extern uint8_t __RAM_EMU_END__[];
 
+extern uint8_t __CORE_DATA_START__[];   /* sdk/core_ram_emu.ld */
+
 /* RAM_EMU kept free at the top for the firmware's own ram_malloc() users */
 #define FIRMWARE_RESERVE (16 * 1024)
 
@@ -34,8 +36,93 @@ int dos_main(int start_paused);
 void dos_repaint(void);
 
 /* entry point (CORE_ENTRY in the Makefile; gw_core_entry.S branches here) */
+/* ---- savestates ----
+   Retro-Go owns the menu, the slots and the file names; a slot is every byte of
+   core RAM: .data+.bss, and every region plat_mem_region() handed to the guest
+   (RAM_EMU above the bss, the LCD bonus pool, the DTCM and ITCM pools). The
+   XTulator core is malloc-free (core/static_mem.py), so that is the whole
+   machine. A header with the build stamp and the region table refuses another
+   build or another layout before anything is written. */
+#define SS_NREG 5
+typedef struct { uint32_t addr, len; } ss_region_t;
+typedef struct {
+    char        magic[8];
+    uint32_t    version;
+    char        build[24];
+    ss_region_t reg[SS_NREG];
+} ss_hdr_t;
+static ss_region_t ss_reg[SS_NREG];        /* [1 + plat_mem_region index] */
+static uint8_t ss_boot_pending;
+static int8_t  ss_boot_slot;
+static uint32_t ss_frames;
+
+static void ss_fill(ss_hdr_t* h) {
+    memset(h, 0, sizeof(*h));
+    memcpy(h->magic, "DOSXTSS1", 8);
+    h->version = 1;
+    snprintf(h->build, sizeof(h->build), "%s %s", __DATE__, __TIME__);
+    memcpy(h->reg, ss_reg, sizeof(ss_reg));
+    h->reg[0].addr = (uint32_t)(uintptr_t)__CORE_DATA_START__;
+    h->reg[0].len = (uint32_t)(uintptr_t)&__CORE_BSS_END__ - h->reg[0].addr;
+}
+
+/* 8 KB at a time, feeding the watchdog (~470 ms window) between pieces */
+static bool ss_xfer(FILE* f, void* p, uint32_t n, int wr) {
+    uint8_t* b = (uint8_t*)p;
+    while (n) {
+        uint32_t k = n < 8192u ? n : 8192u;
+        wdog_refresh();
+        if ((wr ? fwrite(b, 1, k, f) : fread(b, 1, k, f)) != k) return false;
+        b += k;
+        n -= k;
+    }
+    return true;
+}
+
+static bool ss_save(const char* path) {
+    ss_hdr_t h;
+    bool ok = false;
+    if (!path) return false;
+    dos_ss_presave();
+    ss_fill(&h);
+    FILE* f = fopen(path, "wb");
+    if (!f) return false;
+    if (fwrite(&h, 1, sizeof(h), f) == sizeof(h)) {
+        ok = true;
+        for (int i = 0; i < SS_NREG && ok; i++)
+            if (h.reg[i].len) ok = ss_xfer(f, (void*)(uintptr_t)h.reg[i].addr, h.reg[i].len, 1);
+    }
+    fclose(f);
+    return ok;
+}
+
+static bool ss_load(const char* path) {
+    ss_hdr_t h, cur;
+    dos_ss_live_t live;
+    bool ok = true;
+    if (!path) return false;
+    FILE* f = fopen(path, "rb");
+    if (!f) return false;
+    ss_fill(&cur);
+    if (fread(&h, 1, sizeof(h), f) != sizeof(h) || memcmp(&h, &cur, sizeof(h)) != 0) {
+        fclose(f);                           /* another build or layout: untouched */
+        return false;
+    }
+    dos_ss_live_get(&live);
+    uint32_t frames = ss_frames;
+    for (int i = 0; i < SS_NREG && ok; i++)
+        if (h.reg[i].len) ok = ss_xfer(f, (void*)(uintptr_t)h.reg[i].addr, h.reg[i].len, 0);
+    fclose(f);
+    ss_frames = frames;
+    ss_boot_pending = 0;
+    dos_ss_live_put(&live);
+    return ok;
+}
+
+/* entry point (CORE_ENTRY in the Makefile; gw_core_entry.S branches here) */
 int app_main_dos(uint8_t load_state, uint8_t start_paused, int8_t save_slot) {
-    (void)load_state; (void)save_slot;
+    ss_boot_pending = load_state ? 1 : 0;
+    ss_boot_slot = save_slot;
     return dos_main(start_paused);
 }
 
@@ -47,7 +134,7 @@ void plat_init(bool start_paused) {
     common_emu_state.frame_time_10us = (int16_t)(100000 / PLAT_FPS);
     common_emu_state.pause_after_frames = start_paused ? 2 : 0;
     odroid_system_init(APPID_CORE, PLAT_AUDIO_RATE);
-    odroid_system_emu_init(NULL, NULL, NULL, NULL, NULL, NULL, NULL);   /* no savestates yet */
+    odroid_system_emu_init(ss_load, ss_save, NULL, NULL, NULL, NULL, NULL);
     common_emu_state.pause_after_frames = start_paused ? 2 : 0;
 
     lcd_setup_framebuffers(LCD_MODE_LUT8);   /* 8-bit indexed: frees ~150 KB of LCD pool */
@@ -56,7 +143,16 @@ void plat_init(bool start_paused) {
     *(volatile uint32_t*)0xE0001000u |= 1u;                /* DWT_CTRL.CYCCNTENA */
 }
 
+static size_t plat_mem_region_(int index, uint8_t** base);
 size_t plat_mem_region(int index, uint8_t** base) {
+    size_t n = plat_mem_region_(index, base);
+    if (index >= 0 && index < SS_NREG - 1) {
+        ss_reg[1 + index].addr = n ? (uint32_t)(uintptr_t)*base : 0;
+        ss_reg[1 + index].len = (uint32_t)n;
+    }
+    return n;
+}
+static size_t plat_mem_region_(int index, uint8_t** base) {
     if (index == 0) {
         uintptr_t start = ((uintptr_t)&__CORE_BSS_END__ + 7u) & ~(uintptr_t)7u;
         uintptr_t end = (uintptr_t)__RAM_EMU_END__ - FIRMWARE_RESERVE;
@@ -88,8 +184,33 @@ size_t plat_mem_region(int index, uint8_t** base) {
 
 void plat_set_palette(const uint32_t* rgb, int count) { lcd_set_clut(rgb, (uint16_t)count); }
 
+/* Test hook for a debugger: 1 saves, 2 loads, 3 saves and loads 120 frames on */
+volatile uint32_t dxt_ss_request, dxt_ss_saves, dxt_ss_loads, dxt_ss_fails;
+static uint32_t ss_test_at;
+static void ss_test(void) {
+    static const char path[] = "/roms/dos/dosxt_ss_test.sav";
+    uint32_t r = dxt_ss_request;
+    if (r) {
+        dxt_ss_request = 0;
+        if (r == 1 || r == 3) { if (ss_save(path)) dxt_ss_saves++; else dxt_ss_fails++; }
+        if (r == 2) { if (ss_load(path)) dxt_ss_loads++; else dxt_ss_fails++; }
+        if (r == 3) ss_test_at = ss_frames + 120;
+    }
+    if (ss_test_at && ss_frames >= ss_test_at) {
+        ss_test_at = 0;
+        if (ss_load(path)) dxt_ss_loads++; else dxt_ss_fails++;
+    }
+}
+
 bool plat_frame_begin(void) {
     wdog_refresh();
+    ss_frames++;
+    ss_test();
+    /* "Resume" from the launcher: the slot loads once the machine is up */
+    if (ss_boot_pending && ss_frames > 2) {
+        ss_boot_pending = 0;
+        odroid_system_emu_load_state(ss_boot_slot);
+    }
     return common_emu_frame_loop();
 }
 

@@ -82,6 +82,23 @@ On-screen keyboard, disk swapping, CPU speed and mouse:
 [docs/controles.en.md](docs/controles.en.md). Video and sound:
 [docs/video-sonido.en.md](docs/video-sonido.en.md).
 
+## Save states
+
+From the retro-go menu (**PAUSE/SET**) you can save the game into any of its
+slots and come back to it whenever you like. When you launch a game that has
+saves, retro-go lets you choose between **Resume** and starting over.
+
+- **What is saved:** the whole PC XT: CPU, all of memory (with DOS and the game
+  loaded), video, sound and which floppy was in A:. A save is about 1 MB and
+  takes a few seconds to save and to load.
+- **A save only works with the same `dosxt.bin`.** After updating the core,
+  older saves are refused: nothing is loaded and the game carries on as it
+  was.
+- **Disk images are not rolled back.** Whatever the game wrote to its `.img`
+  (its own saved games, high scores) stays as it is, and the restored DOS may
+  not know about it until it reads the disk again. The safest thing is to use
+  either retro-go's saves or the game's own, not both.
+
 ## More
 
 - [docs/desarrollo.en.md](docs/desarrollo.en.md): how it is built and how to

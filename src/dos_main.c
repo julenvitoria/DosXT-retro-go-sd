@@ -227,6 +227,41 @@ static void insert_a(const char* name) {
     }
 }
 
+/* ---- savestates: the session's half (platform.h) ---- */
+static void update_palette(int force);
+static uint32_t info_until;   /* defined with the info line below */
+void dos_ss_presave(void) {
+    /* a seek pushes the FILE's buffered writes to the card */
+    for (int i = 0; i < 4; i++)
+        if (biosdisk[i].inserted && biosdisk[i].diskfile)
+            fseek(biosdisk[i].diskfile, 0L, SEEK_CUR);
+}
+void dos_ss_live_get(dos_ss_live_t* l) {
+    for (int i = 0; i < 4; i++) {
+        l->disk[i] = biosdisk[i].diskfile;
+        l->ins[i] = biosdisk[i].inserted;
+    }
+    memcpy(l->a, drive_a, sizeof(l->a));
+    l->info_until = info_until;
+}
+void dos_ss_live_put(const dos_ss_live_t* l) {
+    char saved_a[sizeof(drive_a)];
+    for (int i = 0; i < 4; i++) {
+        biosdisk[i].diskfile = (FILE*)l->disk[i];
+        biosdisk[i].inserted = l->ins[i];
+    }
+    info_until = l->info_until;
+    /* A: is the one drive the user changes at run time (the disk menu) */
+    memcpy(saved_a, drive_a, sizeof(saved_a));
+    memcpy(drive_a, l->a, sizeof(drive_a));
+    if (strcmp(saved_a, l->a) != 0) {
+        if (!saved_a[0] || saved_a[0] == '(') insert_a(EJECT_ENTRY);
+        else insert_a(saved_a);
+    }
+    /* the LTDC holds THIS session's palette, whatever the image remembers */
+    update_palette(1);
+}
+
 /* ---- per-game configuration ---- */
 static GAMECFG gcfg;
 static char cfg_name[40] = "";

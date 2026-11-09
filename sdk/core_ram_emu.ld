@@ -202,6 +202,7 @@ SECTIONS
   /* ------------------------------------------------------------------ */
   .data :
   {
+    __CORE_DATA_START__ = .;   /* DosXT savestates: the first byte of core state */
     *(.data*)
   } >RAM_EMU :data
 
