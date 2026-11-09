@@ -1,6 +1,6 @@
 # Crear las imágenes de disco
 
-*[Read in English](discos.en.md) · Vuelve al [README](../README.md)*
+*[Read in English](discos.en.md) · Vuelve al [README](../README.es.md)*
 
 Todo se hace con `tools/fat12.py`, que solo necesita Python 3. Para ver todas
 sus órdenes: `python3 tools/fat12.py`; para la ayuda de una:
