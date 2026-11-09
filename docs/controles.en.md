@@ -9,8 +9,8 @@
 | D-pad | Arrows (or the pointer, with `mouse = on`) | Move |
 | A | Enter | Press the key |
 | B | Space | Close |
-| GAME (START on Zelda) | Esc | — |
-| TIME (SELECT on Zelda) | **Open the keyboard** | Close |
+| GAME (START on Zelda) | **Open the keyboard** | Close |
+| TIME (SELECT on Zelda) | Esc | — |
 | START / SELECT (Zelda) | Tab / Backspace | — |
 | PAUSE/SET | retro-go menu (volume, brightness, quit…) | |
 
@@ -30,7 +30,8 @@ move. Holding the D-pad keeps the cursor going.
 - **A:** opens the folder's disk list and puts the chosen one in A: (DOS sees
   the disk change).
 - **CPU** changes the speed: 4.77 (IBM PC/XT), 8 (default), 10, 12, 16 and
-  20 MHz. It is a maximum: if the console cannot keep up, the core lowers it by
+  20 MHz, for that session only (the next launch uses the `.cfg`'s, or 8 MHz
+  if it sets none). It is a maximum: if the console cannot keep up, the core lowers it by
   itself and the bottom band shows it (`16->11.2 MHz`).
 - **80c** changes how 80-column text looks: a 40-column window that follows
   the cursor (default) or the whole line in small letters.

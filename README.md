@@ -74,8 +74,8 @@ select = space          ; SELECT: Space (pause)
 |---|---|
 | D-pad | Arrows (or the pointer, with `mouse = on`) |
 | A / B | Enter / Space |
-| GAME | Esc |
-| **TIME** | **Opens the on-screen keyboard** (CPU, disk swap…) |
+| **GAME** | **Opens the on-screen keyboard** (CPU, disk swap…) |
+| TIME | Esc |
 | PAUSE/SET | retro-go menu; with the D-pad, volume and brightness |
 
 On-screen keyboard, disk swapping, CPU speed and mouse:
