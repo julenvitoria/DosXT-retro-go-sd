@@ -74,8 +74,8 @@ select = space          ; SELECT: Espacio (pausa)
 |---|---|
 | Cruceta | Flechas (o el puntero, con `mouse = on`) |
 | A / B | Intro / Espacio |
-| GAME | Esc |
-| **TIME** | **Abre el teclado en pantalla** (CPU, cambio de disco…) |
+| **GAME** | **Abre el teclado en pantalla** (CPU, cambio de disco…) |
+| TIME | Esc |
 | PAUSE/SET | Menú de retro-go; con la cruceta, volumen y brillo |
 
 Teclado en pantalla, cambio de disco, velocidad de la CPU y ratón:
