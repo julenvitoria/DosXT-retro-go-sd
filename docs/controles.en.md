@@ -1,6 +1,6 @@
 # Controls
 
-*[Leer en español](controles.md) · Back to the [README](../README.en.md)*
+*[Leer en español](controles.md) · Back to the [README](../README.md)*
 
 ## Buttons
 

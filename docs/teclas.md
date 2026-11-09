@@ -2,7 +2,7 @@
 
 *[Read in English](teclas.en.md)*
 
-*Parte de la [configuración por juego](../README.md#configuración-por-juego-cfg).*
+*Parte de la [configuración por juego](../README.es.md#configuración-por-juego-cfg).*
 
 Lo que va detrás del `=` de un botón (`a = shift`) es el nombre de una tecla del PC. Da igual
 mayúsculas o minúsculas. Se pueden juntar hasta 3 con `+` (`ctrl+c`, `alt+x`, `shift+f1`): se pulsan
