@@ -9,8 +9,8 @@
 | Cruceta | Flechas (o el puntero, con `mouse = on`) | Mover |
 | A | Intro | Pulsar la tecla |
 | B | Espacio | Cerrar |
-| GAME (START en Zelda) | Esc | — |
-| TIME (SELECT en Zelda) | **Abrir el teclado** | Cerrar |
+| GAME (START en Zelda) | **Abrir el teclado** | Cerrar |
+| TIME (SELECT en Zelda) | Esc | — |
 | START / SELECT (Zelda) | Tab / Retroceso | — |
 | PAUSE/SET | Menú de retro-go (volumen, brillo, salir…) | |
 
@@ -31,7 +31,8 @@ mueve. Manteniendo la cruceta el cursor sigue avanzando.
 - **A:** abre la lista de discos de la carpeta y mete el elegido en A: (el DOS
   ve el cambio de disco).
 - **CPU** cambia la velocidad: 4,77 (IBM PC/XT), 8 (por defecto), 10, 12, 16
-  y 20 MHz. Es un máximo: si la consola no llega, el núcleo baja solo y la
+  y 20 MHz, solo para esa partida (al volver a arrancar el juego vale la del
+  `.cfg`, o 8 MHz si no pone nada). Es un máximo: si la consola no llega, el núcleo baja solo y la
   franja de abajo lo indica (`16->11.2 MHz`).
 - **80c** cambia cómo se ve el texto de 80 columnas: una ventana de 40 que sigue
   al cursor (por defecto) o la línea entera con letras pequeñas.

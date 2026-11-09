@@ -79,7 +79,7 @@ static const struct { const char* mhz; uint32_t ips; const char* pc; } speeds[] 
     { "20",   1320000, "" },
 };
 #define NSPEEDS (sizeof(speeds) / sizeof(speeds[0]))
-static int speed_idx = 1;                 /* 8 MHz (saved setting "CpuMHz") */
+static int speed_idx = 1;                 /* 8 MHz; the .cfg (cpu =) or the keyboard changes it */
 static uint32_t ips = 528000;
 static uint32_t osd_frames = 0;           /* frames left to show the on-screen speed message */
 
@@ -160,7 +160,6 @@ static void osk_press(uint8_t sc) {
     if (sc == SC_ZOOM) { cga_zoom80 ^= 1; plat_setting_set("Zoom80", cga_zoom80); return; }
     if (sc == SC_CPU) {
         speed_idx = (speed_idx + 1) % NSPEEDS; ips = speeds[speed_idx].ips;
-        plat_setting_set("CpuMHz", speed_idx);
         osd_frames = 2 * PLAT_FPS;
         return;
     }
@@ -271,8 +270,9 @@ static uint32_t prev_buttons = 0;
 /* button i (BTN_* bit i) -> up to 3 make codes (pressed in order, released in reverse) */
 static uint8_t padkeys[GC_BUTTONS][3] = {
     {0x48}, {0x50}, {0x4B}, {0x4D},              /* up down left right: arrows */
-    {0x1C}, {0x39}, {0x01},                      /* A Enter, B Space, GAME Esc */
-    {GC_KEY_KEYBOARD},                           /* TIME: on-screen keyboard */
+    {0x1C}, {0x39},                              /* A Enter, B Space */
+    {GC_KEY_KEYBOARD},                           /* GAME: on-screen keyboard */
+    {0x01},                                      /* TIME: Esc */
     {0x0F}, {0x0E},                              /* START Tab, SELECT Backspace */
 };
 
@@ -344,6 +344,14 @@ static uint32_t nav_repeat(uint32_t b, uint32_t pressed) {
 static int run_state;                     /* "run =" autotyping (below): non-zero while it works */
 static int dos_prompt_visible(void);
 
+/* the buttons that open (and close) the on-screen keyboard */
+static uint32_t osk_door(void) {
+    uint32_t door = 0;
+    for (int i = 0; i < GC_BUTTONS; i++)
+        if (padkeys[i][0] == GC_KEY_KEYBOARD) door |= 1u << i;
+    return door;
+}
+
 static void handle_input(uint32_t b) {
     uint32_t pressed = b & ~prev_buttons;
     /* While "run =" is still typing its commands, a button press would land in the middle
@@ -353,9 +361,7 @@ static void handle_input(uint32_t b) {
        from the moment a DOS prompt is on screen. Before that it still works, so Esc can
        skip the BIOS memory test. */
     if (ui_mode == 0 && run_state && (run_state != 1 || dos_prompt_visible())) {
-        uint32_t door = 0;
-        for (int i = 0; i < GC_BUTTONS; i++)
-            if (padkeys[i][0] == GC_KEY_KEYBOARD) door |= 1u << i;
+        uint32_t door = osk_door();
         b &= door;
         pressed &= door;
     }
@@ -376,14 +382,14 @@ static void handle_input(uint32_t b) {
             }
         }
     } else if (ui_mode == 1) {
-        if (pressed & (BTN_B | BTN_TIME)) ui_mode = 0;
+        if (pressed & (BTN_B | osk_door())) ui_mode = 0;
         else if (pressed & BTN_UP) osk_move_row(-1);
         else if (pressed & BTN_DOWN) osk_move_row(1);
         else if (pressed & BTN_LEFT) osk_col = (osk_col + row_len(osk_row) - 1) % row_len(osk_row);
         else if (pressed & BTN_RIGHT) osk_col = (osk_col + 1) % row_len(osk_row);
         else if (pressed & BTN_A) osk_press(osk_rows[osk_row][osk_col].sc);
     } else {
-        if (pressed & (BTN_B | BTN_TIME)) ui_mode = 1;
+        if (pressed & (BTN_B | osk_door())) ui_mode = 1;
         else if ((pressed & BTN_UP) && n_images) disk_sel = (disk_sel + n_images - 1) % n_images;
         else if ((pressed & BTN_DOWN) && n_images) disk_sel = (disk_sel + 1) % n_images;
         else if ((pressed & BTN_A) && n_images) { insert_a(images[disk_sel]); ui_mode = 0; }
@@ -518,7 +524,7 @@ static void draw_bands(uint8_t* fb) {
             snprintf(line, sizeof(line), gcfg.errors ? "cfg: %.24s (%d errores)" : "cfg: %.24s", cfg_name, gcfg.errors);
             ui_text(fb, 0, 2, line, gcfg.errors ? 12 : 10, 0);
         } else {
-            ui_text(fb, 0, 2, "A=Intro B=Espacio GAME=Esc TIME=Teclado", 7, 0);
+            ui_text(fb, 0, 2, "A=Intro B=Espacio GAME=Teclado TIME=Esc", 7, 0);
         }
         if (drive_d[0])
             snprintf(line, sizeof(line), "A:%.11s C:%.11s D:%.9s", drive_a[0] ? drive_a : "-", drive_c, drive_d);
@@ -890,7 +896,10 @@ static void apply_config(void) {
 #endif
     int has_osk = 0;                                   /* keep a way to open the keyboard */
     for (int i = 0; i < GC_BUTTONS; i++) if (padkeys[i][0] == GC_KEY_KEYBOARD) has_osk = 1;
-    if (!has_osk) { padkeys[7][0] = GC_KEY_KEYBOARD; padkeys[7][1] = 0; }
+    if (!has_osk) {                                    /* GAME, unless the .cfg gave it a key */
+        int k = (gcfg.set[6] && !gcfg.set[7]) ? 7 : 6;
+        padkeys[k][0] = GC_KEY_KEYBOARD; padkeys[k][1] = 0;
+    }
     if (gcfg.cpu_mhz10) {
         int best = 0, bestd = 1 << 30;
         for (int i = 0; i < (int)NSPEEDS; i++) {
@@ -1146,8 +1155,9 @@ void dos_repaint(void) { draw_screen(plat_framebuffer()); }
 int dos_main(int start_paused) {
     plat_init(start_paused != 0);
     update_palette(1);
-    speed_idx = (int)plat_setting_get("CpuMHz", 1);
-    if (speed_idx < 0 || speed_idx >= (int)NSPEEDS) speed_idx = 1;
+    /* 8 MHz Turbo XT unless the game's .cfg asks for another speed (cpu =). A speed
+       picked on the on-screen keyboard lasts for that session only. */
+    speed_idx = 1;
     ips = speeds[speed_idx].ips;
     /* no speed pop-up at start-up: the bottom status line already shows it for 7 s.
        Pressing CPU on the on-screen keyboard still pops it up, over the keys. */

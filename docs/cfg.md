@@ -32,14 +32,15 @@ arranque, con los botones por defecto.
 |---|---|---|
 | `boot` | nombre de imagen (`!BOOT.img`, `c.img`…) | El DOS arranca desde esa imagen. Se busca en `/cores/dosxt` y luego en `/roms/dos`. Si es un disquete, arranca en A: y el juego queda en B: (disquete) o C: (disco duro). Si es un disco duro con DOS instalado, arranca en C: y el juego queda en A: (disquete) o D: (disco duro). |
 | `run` | órdenes separadas por `;` | Se escriben en el prompt del DOS, cada una cuando aparece el prompt (`A:\>`), con Intro detrás. Ej.: `b:;cd \juego;juego`. |
-| `cpu` | `4.77`, `8`, `10`, `12`, `16`, `20` | Velocidad de la CPU en MHz al arrancar (también se cambia con la tecla `CPU` del teclado en pantalla). |
+| `cpu` | `4.77`, `8`, `10`, `12`, `16`, `20` | Velocidad de la CPU en MHz al arrancar; sin `cpu`, 8 MHz (también se cambia con la tecla `CPU` del teclado en pantalla, solo para esa partida). |
 | `video` | `vga` (por defecto) o `cga` | `cga` quita los gráficos EGA/VGA y deja 640 KB enteros para el DOS. |
 | `vram` | `64`, `128` (por defecto), `256` | Memoria de vídeo EGA/VGA en KB. Si un juego avisa de "Falta memoria de video", súbela. |
 | `zoom80` | `1` / `0` | Texto de 80 columnas: `1` = ventana de 40 columnas que sigue al cursor, `0` = la línea entera. |
 | `mouse` (o `raton`) | `on` / `off` | Ratón: la cruceta mueve el puntero y A/B son los botones (ver [controles.md](controles.md#ratón)). |
 | `up` `down` `left` `right` (o `arriba` `abajo` `izquierda` `derecha`), `a`, `b`, `game`, `time`, `start` (o `x`), `select` (o `y`) | nombre de tecla, o hasta 3 con `+` | Qué tecla del PC manda cada botón. Lista de nombres: [`teclas.md`](teclas.md). Además: `keyboard`/`teclado` (abre el teclado en pantalla), `none`/`nada` (sin función) y, para el ratón, `click` `click2` `mup` `mdown` `mleft` `mright`. |
 
-Si ningún botón queda como `keyboard`, TIME sigue abriendo el teclado en
+Si ningún botón queda como `keyboard`, GAME (o TIME, si el `.cfg` le dio una
+tecla a GAME) sigue abriendo el teclado en
 pantalla.
 
 ## Opciones de los propios juegos (sonido, vídeo…)
