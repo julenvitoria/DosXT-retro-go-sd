@@ -465,6 +465,22 @@ c = sub(c, "\t\t\ti8253->bcd[sel] = value & 1;",
 # x 25 = 1,193,175 (0.0006 % off).
 c = sub(c, "timing_addTimer(i8253_tickCallback, (void*)(&i8253->cbdata), 48000, TIMING_ENABLED);",
            "timing_addTimer(i8253_tickCallback, (void*)(&i8253->cbdata), 47727, TIMING_ENABLED);")
+# A counter READ with no latch command before it returns the LIVE count, as on the part.
+# XTulator always answered with the last latched value: Ironman Super Off Road times one
+# frame by writing a control word and then reading the count straight away, so it measured
+# a stale value, loaded a timer period 2/3 of a frame, and its INT 08h -- which waits for
+# the vertical blank before reloading -- spun most of every frame: the game never got past
+# its loading. The latch now holds only from the latch command to the read that ends it.
+c = sub(c, "#include \"i8253.h\"\n",
+           "#include \"i8253.h\"\nstatic uint8_t i8253_latched[3];   /* a latch command is waiting to be read */\n")
+c = sub(c, "\t\treturn 0xFF; //no read of control word possible\n\t}\n",
+           "\t\treturn 0xFF; //no read of control word possible\n\t}\n"
+           "\tif (!i8253_latched[portnum] && (i8253->rlmode[portnum] != 3 || i8253->dataflipflop[portnum] == 0))\n"
+           "\t\ti8253->latch[portnum] = (uint16_t)i8253->counter[portnum];\n"
+           "\tif (i8253->rlmode[portnum] != 3 || i8253->dataflipflop[portnum] == 1)\n"
+           "\t\ti8253_latched[portnum] = 0;\n")
+c = sub(c, "\t\t\ti8253->latch[sel] = i8253->counter[sel];",
+           "\t\t\ti8253->latch[sel] = i8253->counter[sel];\n\t\t\ti8253_latched[sel] = 1;")
 wr("chipset/i8253.c", c)
 c = rd("modules/audio/pcspeaker.c")
 c = sub(c, "\ttiming_addTimer(pcspeaker_callback, spk, SAMPLE_RATE, TIMING_ENABLED);",
