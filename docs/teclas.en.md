@@ -2,7 +2,7 @@
 
 *[Leer en español](teclas.md)*
 
-*Part of the [per-game configuration](../README.en.md#per-game-configuration-cfg).*
+*Part of the [per-game configuration](../README.md#per-game-configuration-cfg).*
 
 What goes after a button's `=` (`a = shift`) is the name of a PC key. Upper or lower case does not
 matter. Up to 3 can be joined with `+` (`ctrl+c`, `alt+x`, `shift+f1`): they are pressed in that

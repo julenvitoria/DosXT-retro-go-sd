@@ -1,6 +1,6 @@
 # Making the disk images
 
-*[Leer en español](discos.md) · Back to the [README](../README.en.md)*
+*[Leer en español](discos.md) · Back to the [README](../README.md)*
 
 Everything is done with `tools/fat12.py`, which only needs Python 3. To see
 all its commands: `python3 tools/fat12.py`; for one command's help:

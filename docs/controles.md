@@ -1,6 +1,6 @@
 # Controles
 
-*[Read in English](controles.en.md) · Vuelve al [README](../README.md)*
+*[Read in English](controles.en.md) · Vuelve al [README](../README.es.md)*
 
 ## Botones
 

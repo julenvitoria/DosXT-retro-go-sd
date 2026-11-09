@@ -1,109 +1,108 @@
-# DosXT: MS-DOS (PC XT) para la Game & Watch (retro-go SD)
+# DosXT: MS-DOS (PC XT) for the Game & Watch (retro-go SD)
 
-*[Read in English](README.en.md)*
+*[Leer en español](README.es.md)*
 
-Un PC XT emulado como núcleo externo del firmware **retro-go SD**: CPU 8088 de
-XTulator, BIOS libre de Sergey Kiselev, gráficos CGA, EGA y VGA, ratón, AdLib y
-Sound Blaster. Aparece en el menú como **DosXT** y cada imagen de disco se
-elige como una ROM.
+An emulated PC XT as an external core for the **retro-go SD** firmware:
+XTulator's 8088 CPU, Sergey Kiselev's free BIOS, CGA, EGA and VGA graphics,
+mouse, AdLib and Sound Blaster. It shows up in the menu as **DosXT** and each
+disk image is picked like a ROM.
 
-- Arranca un **MS-DOS de verdad**, que pones tú (no se incluye ninguno).
-- Para juegos que piden un 286/386 (VGA exigente, memoria extendida) está el
-  otro núcleo, [DosAT-retro-go-sd](https://github.com/julenvitoria/DosAT-retro-go-sd)
-  (`dosat.bin`). Los dos conviven en la misma tarjeta.
-- Necesita un firmware de la rama `external_cores` (ABI v2, `b791f15` del
-  11-10-2026 o posterior). Con uno más antiguo el lanzador dice "ABI mismatch".
+- It boots a **real MS-DOS**, which you supply (none is included).
+- For games that want a 286/386 (demanding VGA, extended memory) there is the
+  other core, [DosAT-retro-go-sd](https://github.com/julenvitoria/DosAT-retro-go-sd)
+  (`dosat.bin`). Both live on the same card.
+- It needs a firmware from the `external_cores` branch (ABI v2, `b791f15` of
+  11-10-2026 or later). With an older one the launcher says "ABI mismatch".
 
-## En la tarjeta SD
+## On the SD card
 
 ```
-/cores/dosxt.bin           <- el núcleo (out/dosxt.bin)
-/cores/dosxt/!BOOT.img     <- disquete de arranque con tu MS-DOS
-/cores/dosxt/MONKEY.cfg    <- configuración de cada juego (opcional), mismo nombre
-/roms/dos/MONKEY.img       <- cada juego, como imagen de disco
+/cores/dosxt.bin           <- the core (out/dosxt.bin)
+/cores/dosxt/!BOOT.img     <- boot floppy with your MS-DOS
+/cores/dosxt/MONKEY.cfg    <- each game's configuration (optional), same name
+/roms/dos/MONKEY.img       <- each game, as a disk image
 ```
 
-## Crear las imágenes
+## Making the images
 
-Todo se hace con `tools/fat12.py`, que solo necesita Python 3 (Windows, Linux o
-macOS).
+Everything is done with `tools/fat12.py`, which only needs Python 3 (Windows,
+Linux or macOS).
 
-**1. El disquete de arranque**, una sola vez, desde el disco 1 de MS-DOS 6.22:
+**1. The boot floppy**, once, from MS-DOS 6.22 disk 1:
 
 ```
 python3 tools/fat12.py bootdisk Disk01.img !BOOT.img
 ```
 
-**2. La imagen de cada juego**, desde la carpeta del juego:
+**2. Each game's image**, from the game's folder:
 
 ```
-python3 tools/fat12.py new prince.img PRINCE/*            # disquete de 1,44 MB
-python3 tools/fat12.py newhd monkey.img --size 8 MONKEY   # disco duro, juegos grandes
+python3 tools/fat12.py new prince.img PRINCE/*            # 1.44 MB floppy
+python3 tools/fat12.py newhd monkey.img --size 8 MONKEY   # hard disk, for large games
 ```
 
-Más formas (un disquete arrancable por juego, instalar MS-DOS en un disco duro,
-meter archivos en una imagen…): [**docs/discos.md**](docs/discos.md).
+More ways (a bootable floppy per game, installing MS-DOS on a hard disk, adding
+files to an image…): [**docs/discos.en.md**](docs/discos.en.md).
 
-## Configurar un juego (`.cfg`)
+## Configuring a game (`.cfg`)
 
-El `.cfg` le dice al núcleo con qué DOS arrancar y qué escribir en el prompt.
-Un ejemplo completo:
+The `.cfg` tells the core which DOS to boot and what to type at the prompt. A
+complete example:
 
 ```ini
-; /cores/dosxt/MONKEY.cfg  -- el juego es el disco duro /roms/dos/MONKEY.img
-boot   = !BOOT.img      ; arranca el DOS desde este disquete (A:); el juego queda en C:
-run    = c:;cd \monkey;monkey a   ; lo que se escribe en el prompt (";" = Intro)
-cpu    = 16             ; MHz: 4.77, 8, 10, 12, 16 o 20
-mouse  = on             ; la cruceta mueve el puntero del ratón
-b      = click          ; B: botón izquierdo del ratón
-a      = click2         ; A: botón derecho
-start  = f5             ; START: F5 (en Monkey Island, guardar partida)
-select = space          ; SELECT: Espacio (pausa)
+; /cores/dosxt/MONKEY.cfg  -- the game is the hard disk /roms/dos/MONKEY.img
+boot   = !BOOT.img      ; boot DOS from this floppy (A:); the game is on C:
+run    = c:;cd \monkey;monkey a   ; typed at the prompt (";" = Enter)
+cpu    = 16             ; MHz: 4.77, 8, 10, 12, 16 or 20
+mouse  = on             ; the D-pad moves the mouse pointer
+b      = click          ; B: left mouse button
+a      = click2         ; A: right mouse button
+start  = f5             ; START: F5 (in Monkey Island, save game)
+select = space          ; SELECT: Space (pause)
 ```
 
-- Con un disquete de arranque, el juego queda en **B:** si es un disquete y en
-  **C:** si es un disco duro.
-- Sin `.cfg`, la imagen arranca sola si es un disquete de arranque.
-- **Todas las opciones**: [**docs/cfg.md**](docs/cfg.md). **Nombres de las
-  teclas**: [docs/teclas.md](docs/teclas.md). Ejemplos listos:
+- With a boot floppy, the game is on **B:** if it is a floppy and on **C:** if
+  it is a hard disk.
+- Without a `.cfg`, the image boots by itself if it is a boot floppy.
+- **Every option**: [**docs/cfg.en.md**](docs/cfg.en.md). **Key names**:
+  [docs/teclas.en.md](docs/teclas.en.md). Ready-made examples:
   [examples/cfg/](examples/cfg/).
 
-## Controles
+## Controls
 
-| Botón | Qué hace |
+| Button | What it does |
 |---|---|
-| Cruceta | Flechas (o el puntero, con `mouse = on`) |
-| A / B | Intro / Espacio |
+| D-pad | Arrows (or the pointer, with `mouse = on`) |
+| A / B | Enter / Space |
 | GAME | Esc |
-| **TIME** | **Abre el teclado en pantalla** (CPU, cambio de disco…) |
-| PAUSE/SET | Menú de retro-go; con la cruceta, volumen y brillo |
+| **TIME** | **Opens the on-screen keyboard** (CPU, disk swap…) |
+| PAUSE/SET | retro-go menu; with the D-pad, volume and brightness |
 
-Teclado en pantalla, cambio de disco, velocidad de la CPU y ratón:
-[docs/controles.md](docs/controles.md). Vídeo y sonido:
-[docs/video-sonido.md](docs/video-sonido.md).
+On-screen keyboard, disk swapping, CPU speed and mouse:
+[docs/controles.en.md](docs/controles.en.md). Video and sound:
+[docs/video-sonido.en.md](docs/video-sonido.en.md).
 
-## Partidas guardadas
+## Save states
 
-Desde el menú de retro-go (**PAUSE/SET**) puedes guardar la partida en
-cualquiera de sus huecos y volver a ella cuando quieras. Al lanzar un juego que
-tiene partidas guardadas, retro-go te deja elegir entre **Continuar** y empezar
-de nuevo.
+From the retro-go menu (**PAUSE/SET**) you can save the game into any of its
+slots and come back to it whenever you like. When you launch a game that has
+saves, retro-go lets you choose between **Resume** and starting over.
 
-- **Qué se guarda:** el PC XT entero: CPU, toda la memoria (con el DOS y el
-  juego cargados), vídeo, sonido y qué disquete había en A:. Cada guardado
-  ocupa alrededor de 1 MB y tarda unos segundos en guardarse y en cargarse.
-- **Solo vale con el mismo `dosxt.bin`.** Si actualizas el núcleo, los
-  guardados de antes se rechazan: no se carga nada y el juego sigue como
-  estaba.
-- **Las imágenes de disco no vuelven atrás.** Lo que el juego haya escrito en
-  su `.img` (sus propias partidas, récords) se queda como esté, y el DOS
-  recuperado puede no saber de ello hasta que vuelva a leer el disco. Lo más
-  seguro es usar o los guardados de retro-go o las partidas del propio juego,
-  no mezclarlos.
+- **What is saved:** the whole PC XT: CPU, all of memory (with DOS and the game
+  loaded), video, sound and which floppy was in A:. A save is about 1 MB and
+  takes a few seconds to save and to load.
+- **A save only works with the same `dosxt.bin`.** After updating the core,
+  older saves are refused: nothing is loaded and the game carries on as it
+  was.
+- **Disk images are not rolled back.** Whatever the game wrote to its `.img`
+  (its own saved games, high scores) stays as it is, and the restored DOS may
+  not know about it until it reads the disk again. The safest thing is to use
+  either retro-go's saves or the game's own, not both.
 
-## Más
+## More
 
-- [docs/desarrollo.md](docs/desarrollo.md): cómo está hecho y cómo compilarlo.
-- Licencia: XTulator es GPLv2+ y la BIOS de Sergey Kiselev GPLv3, así que
-  `dosxt.bin` es **GPLv3**. Fuente font8x8 de Daniel Hepper (dominio público).
-  No incluye ningún software de Microsoft.
+- [docs/desarrollo.en.md](docs/desarrollo.en.md): how it is built and how to
+  build it.
+- Licence: XTulator is GPLv2+ and Sergey Kiselev's BIOS GPLv3, so `dosxt.bin` is
+  **GPLv3**. font8x8 by Daniel Hepper (public domain). No Microsoft software is
+  included.
