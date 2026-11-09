@@ -32,14 +32,15 @@ floppy, with the default buttons.
 |---|---|---|
 | `boot` | image name (`!BOOT.img`, `c.img`…) | DOS boots from that image. It is looked for in `/cores/dosxt`, then in `/roms/dos`. If it is a floppy, it boots on A: and the game is on B: (floppy) or C: (hard disk). If it is a hard disk with DOS installed, it boots on C: and the game is on A: (floppy) or D: (hard disk). |
 | `run` | commands separated by `;` | Typed at the DOS prompt, each one when the prompt (`A:\>`) appears, followed by Enter. E.g. `b:;cd \game;game`. |
-| `cpu` | `4.77`, `8`, `10`, `12`, `16`, `20` | CPU speed in MHz at boot (also changed with the `CPU` key on the on-screen keyboard). |
+| `cpu` | `4.77`, `8`, `10`, `12`, `16`, `20` | CPU speed in MHz at boot; without `cpu`, 8 MHz (also changed with the `CPU` key on the on-screen keyboard, for that session only). |
 | `video` | `vga` (default) or `cga` | `cga` removes the EGA/VGA graphics and leaves the full 640 KB to DOS. |
 | `vram` | `64`, `128` (default), `256` | EGA/VGA video memory in KB. If a game warns "Falta memoria de video", raise it. |
 | `zoom80` | `1` / `0` | 80-column text: `1` = 40-column window that follows the cursor, `0` = the whole line. |
 | `mouse` (or `raton`) | `on` / `off` | Mouse: the d-pad moves the pointer and A/B are the buttons (see [controles.en.md](controles.en.md#mouse)). |
 | `up` `down` `left` `right` (or `arriba` `abajo` `izquierda` `derecha`), `a`, `b`, `game`, `time`, `start` (or `x`), `select` (or `y`) | key name, or up to 3 joined with `+` | Which PC key each button sends. List of names: [`teclas.en.md`](teclas.en.md). Also: `keyboard`/`teclado` (opens the on-screen keyboard), `none`/`nada` (does nothing) and, for the mouse, `click` `click2` `mup` `mdown` `mleft` `mright`. |
 
-If no button is left as `keyboard`, TIME still opens the on-screen keyboard.
+If no button is left as `keyboard`, GAME (or TIME, if the `.cfg` gave GAME a
+key) still opens the on-screen keyboard.
 
 ## The games' own options (sound, video…)
 
