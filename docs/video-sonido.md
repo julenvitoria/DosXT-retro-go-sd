@@ -1,6 +1,6 @@
 # Vídeo y sonido
 
-*[Read in English](video-sonido.en.md) · Vuelve al [README](../README.md)*
+*[Read in English](video-sonido.en.md) · Vuelve al [README](../README.es.md)*
 
 ## EGA y VGA
 

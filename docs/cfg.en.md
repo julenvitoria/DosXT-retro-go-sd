@@ -3,7 +3,7 @@
 *[Leer en español](cfg.md)*
 
 *Everything that can go in a game's `.cfg` for `dosxt.bin`. Back to the
-[README](../README.en.md).*
+[README](../README.md).*
 
 ## Where it goes
 
