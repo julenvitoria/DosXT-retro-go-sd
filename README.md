@@ -25,8 +25,13 @@ disk image is picked like a ROM.
 
 ## Making the images
 
-Everything is done with `tools/fat12.py`, which only needs Python 3 (Windows,
-Linux or macOS).
+**The easy way for games: [DOS G&W Imager](https://julenvitoria.github.io/dos-gnw-imager/)**, a web page that makes the
+game's `.img` and its `.cfg` from the game's folder or `.zip`. Nothing to
+install, and the files never leave your browser. The boot floppy (step 1) is
+still made with `fat12.py`.
+
+From the command line, everything is done with `tools/fat12.py`, which only
+needs Python 3 (Windows, Linux or macOS).
 
 **1. The boot floppy**, once, from MS-DOS 6.22 disk 1:
 

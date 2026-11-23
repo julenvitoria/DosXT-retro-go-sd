@@ -25,8 +25,13 @@ elige como una ROM.
 
 ## Crear las imágenes
 
-Todo se hace con `tools/fat12.py`, que solo necesita Python 3 (Windows, Linux o
-macOS).
+**Lo más fácil para los juegos: [DOS G&W Imager](https://julenvitoria.github.io/dos-gnw-imager/)**, una página web que
+crea el `.img` del juego y su `.cfg` a partir de la carpeta o el `.zip` del
+juego. No hay que instalar nada y los archivos no salen de tu navegador. El
+disquete de arranque (paso 1) se sigue creando con `fat12.py`.
+
+Desde la línea de comandos, todo se hace con `tools/fat12.py`, que solo
+necesita Python 3 (Windows, Linux o macOS).
 
 **1. El disquete de arranque**, una sola vez, desde el disco 1 de MS-DOS 6.22:
 
