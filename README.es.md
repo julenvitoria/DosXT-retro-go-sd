@@ -27,8 +27,11 @@ elige como una ROM.
 
 **Lo más fácil para los juegos: [DOS G&W Imager](https://julenvitoria.github.io/dos-gnw-imager/)**, una página web que
 crea el `.img` del juego y su `.cfg` a partir de la carpeta o el `.zip` del
-juego. No hay que instalar nada y los archivos no salen de tu navegador. El
-disquete de arranque (paso 1) se sigue creando con `fat12.py`.
+juego. No hay que instalar nada y los archivos no salen de tu navegador.
+Eliges desde dónde arranca tu DosXT y calcula la letra de unidad del juego.
+Descargas un `.zip` que se descomprime en la raíz de la SD, y un botón aparte
+baja la última versión de `dosxt.bin`, que solo hace falta poner una vez en
+`/cores/`. El disquete de arranque (paso 1) se sigue creando con `fat12.py`.
 
 Desde la línea de comandos, todo se hace con `tools/fat12.py`, que solo
 necesita Python 3 (Windows, Linux o macOS).

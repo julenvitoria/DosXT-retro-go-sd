@@ -27,8 +27,11 @@ disk image is picked like a ROM.
 
 **The easy way for games: [DOS G&W Imager](https://julenvitoria.github.io/dos-gnw-imager/)**, a web page that makes the
 game's `.img` and its `.cfg` from the game's folder or `.zip`. Nothing to
-install, and the files never leave your browser. The boot floppy (step 1) is
-still made with `fat12.py`.
+install, and the files never leave your browser. You choose what your DosXT
+boots from and it works out the game's drive letter. You get a `.zip` to unzip
+at the root of the SD card, and a separate button downloads the latest
+`dosxt.bin`, which goes in `/cores/` once. The boot floppy (step 1) is still
+made with `fat12.py`.
 
 From the command line, everything is done with `tools/fat12.py`, which only
 needs Python 3 (Windows, Linux or macOS).
